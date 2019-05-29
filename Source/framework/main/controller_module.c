@@ -52,10 +52,17 @@ static void controller_task_fn( void *pv_parameters )
 
         if (mystate.grid_freq > mystate.threshold_overfrq)
         {
+            // lock mutex, wait until lock has been released
             rwlock_writer_lock(&system_state_lock);
+            //look at system state, gb_system_state is temporary. creates fake object, 
+            //make sure freq variable points to gb system state
+
             get_system_state(&gb_system_state);
+            // change set point
             gb_system_state.set_point = 140 ;
+            // overwrite system state
             set_system_state(&gb_system_state);
+            //unlock system state
             rwlock_writer_unlock(&system_state_lock);
         }
 

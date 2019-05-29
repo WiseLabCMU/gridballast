@@ -25,14 +25,14 @@
 #include "wifi_module.h"
 #include "util.h"
 
-#define WIFI_SSID "CMU"
-#define WIFI_PASS ""
+#define WIFI_SSID "ARENA"
+#define WIFI_PASS "wiselabs2018"
 
 /* OpenChirp transducer ids for system state fields */
-#define TRANSDUCER_ID_TEMP_BOTTOM "5a016520f230cf7055615e56"
-#define TRANSDUCER_ID_TEMP_TOP    "5a01652df230cf7055615e57"
-#define TRANSDUCER_ID_GRID_FREQ   "5a9c8b4fa447657867c7a286"
-#define TRANSDUCER_ID_SET_POINT   "5a01655af230cf7055615e5b"
+#define TRANSDUCER_ID_TEMP_BOTTOM "temp_bottom"
+#define TRANSDUCER_ID_TEMP_TOP    "temp_top"
+#define TRANSDUCER_ID_GRID_FREQ   "grid_frzequency"
+#define TRANSDUCER_ID_SET_POINT   "set_point"
 
 const char * const wifi_task_name = "wifi_module_task";
 static const char *TAG = "wifi";
@@ -47,8 +47,8 @@ const int CONNECTED_BIT = BIT0;
 
 /* OpenChirp API definitions */
 static const char * const HOSTNAME = "openchirp.io";
-static const char * const BASE_URL = "https://api.openchirp.io/apiv1/device/5a011bb4f230cf7055615e4c/transducer/";
-static const char * const AUTH_HEADER = "Authorization: Basic NWEwMTFiYjRmMjMwY2Y3MDU1NjE1ZTRjOlA0UUtadGtaMGdqY2dIaU9DdVlnT09VNFNPVEdwODA=";
+static const char * const BASE_URL = "https://api.openchirp.io/apiv1/device/5cd3095dad44f6389e5b2925/transducer/";
+static const char * const AUTH_HEADER = "Authorization: Basic NWNkMzA5NWRhZDQ0ZjYzODllNWIyOTI1OjJRZ3VySm5sNzlEWWI1NFk0d2xZMm9rczNQaXhSZkY=";
 static const char * const USER_AGENT_HEADER = "User-Agent: gridballast1.1";
 
 static system_state_t system_state;
@@ -361,6 +361,7 @@ static void wifi_task_fn( void *pv_parameters ) {
 
         // read system state into local copy
         rwlock_reader_lock(&system_state_lock);
+        
         get_system_state(&system_state);
         rwlock_reader_unlock(&system_state_lock);
 

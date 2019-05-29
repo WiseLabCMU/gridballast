@@ -26,8 +26,10 @@ const char * const sensing_task_name = "sensing_module_task";
  *
  * @return void
  */
+// Play with task below
 static void sensing_task_fn( void *pv_parameters ) {
   while(1);
+  
 }
 
 /*****************************************

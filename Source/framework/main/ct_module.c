@@ -104,12 +104,25 @@ static void relay_task(void* arg)
     get_system_state(&mystate);
     rwlock_reader_unlock(&system_state_lock);
 
-    if (mystate.set_point > 127)
+    if (mystate.grid_freq > 60.000)
     {
       rwlock_writer_lock(&i2c_lock);  
       begin(0);
-      pinMode(4,GPIO_MODE_OUTPUT); 
-      digitalWrite(4,1);
+      pinMode(7,GPIO_MODE_OUTPUT);
+      // pinMode(8, GPIO_MODE_OUTPUT);
+      digitalWrite(7,1);
+      // digitalWrite(8,1);
+      printf("triggered!!!...\n");
+      rwlock_writer_unlock(&i2c_lock);  
+    }
+    else
+    {
+      rwlock_writer_lock(&i2c_lock);  
+      begin(0);
+      pinMode(7,GPIO_MODE_OUTPUT);
+      // pinMode(8, GPIO_MODE_OUTPUT); 
+      digitalWrite(7,0);
+      // digitalWrite(8,0);
       rwlock_writer_unlock(&i2c_lock);  
     }
   }
@@ -117,8 +130,8 @@ static void relay_task(void* arg)
 
 
 void ct_init_task( void ) {
-  adc1_config_width(ADC_WIDTH_12Bit);
-  adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_11db);
+  // adc1_config_width(ADC_WIDTH_12Bit);
+  // adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_11db);
   timer_config_t config;
   config.alarm_en = 1;
   config.auto_reload = 1;
@@ -131,9 +144,9 @@ void ct_init_task( void ) {
   timer_enable_intr(timr_group, timr_idx);
   timer_isr_register(timr_group, timr_idx, &timer_group1_isr, NULL, 0, &s_timer_handle);
   timer_start(timr_group, timr_idx);
-  xTaskCreatePinnedToCore(adc_task, "adc_task", 1024, NULL, 10, NULL,0);
+  // xTaskCreatePinnedToCore(adc_task, "adc_task", 1024, NULL, 10, NULL,0);
 
-  //xTaskCreate(relay_task, "adc_task", 1024, NULL, 10, NULL);
+  xTaskCreate(relay_task, "adc_task", 1024, NULL, 10, NULL);
 
 
 }
