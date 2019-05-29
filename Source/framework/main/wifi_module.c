@@ -250,13 +250,13 @@ static int parse_transducer_value(const char *response, const char *transducer_i
             goto parse_transducer_value_end;
         }
         const cJSON *id_field = cJSON_GetObjectItemCaseSensitive(transducer, "_id");
-        printf("trans id %s\n", id_field->valuestring);
+        // printf("trans id %s\n", id_field->valuestring);
         if (id_field == NULL) {
             goto parse_transducer_value_end;
         }
 
         const cJSON *name = cJSON_GetObjectItemCaseSensitive(transducer, "name");
-        printf("trans name %s\n", name->valuestring);
+        // printf("trans name %s\n", name->valuestring);
 
         if (strcmp(name->valuestring, transducer_id) == 0) {
             const cJSON *value_field = cJSON_GetObjectItemCaseSensitive(transducer, "value");
@@ -265,7 +265,7 @@ static int parse_transducer_value(const char *response, const char *transducer_i
             }
             if (cJSON_IsNumber(value_field)) {
                 *value = value_field->valuedouble;
-				printf("value recvd %lf\n", value_field->valuedouble);
+				// printf("value recvd %lf\n", value_field->valuedouble);
             } else {
                 *value = atof(value_field->valuestring);
             }
