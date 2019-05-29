@@ -82,7 +82,7 @@ void init_task( void *pv_parameters ) {
     
 
     
-    //wifi_init_task();
+    wifi_init_task();
     //sensing_init_task();
     controller_init_task();
 
@@ -100,7 +100,7 @@ void init_task( void *pv_parameters ) {
      printf("Initialization done\n");
 
     
-     rs485_init_task();
+     //rs485_init_task();
 // 
       
 

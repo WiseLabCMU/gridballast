@@ -34,10 +34,10 @@ typedef enum {
 } module_mode_t;
 
 /* OpenChirp transducer ids for system state fields */
-#define TRANSDUCER_ID_TEMP_BOTTOM "5a016520f230cf7055615e56"
-#define TRANSDUCER_ID_TEMP_TOP    "5a01652df230cf7055615e57"
-#define TRANSDUCER_ID_GRID_FREQ   "5a9c8b4fa447657867c7a286"
-#define TRANSDUCER_ID_SET_POINT   "5a01655af230cf7055615e5b"
+#define TRANSDUCER_ID_TEMP_BOTTOM "temp_bottom"
+#define TRANSDUCER_ID_TEMP_TOP    "temp_top"
+#define TRANSDUCER_ID_GRID_FREQ   "grid_frzequency"
+#define TRANSDUCER_ID_SET_POINT   "temp_set"
 
 const char * const wifi_task_name = "wifi_module_task";
 static const char *TAG = "wifi";
@@ -51,8 +51,8 @@ const int CONNECTED_BIT = BIT0;
 
 /* OpenChirp API definitions */
 static const char * const HOSTNAME = "openchirp.io";
-static const char * const BASE_URL = "https://api.openchirp.io/apiv1/device/5a011bb4f230cf7055615e4c/transducer/";
-static const char * const AUTH_HEADER = "Authorization: Basic NWEwMTFiYjRmMjMwY2Y3MDU1NjE1ZTRjOlA0UUtadGtaMGdqY2dIaU9DdVlnT09VNFNPVEdwODA=";
+static const char * const BASE_URL = "https://api.openchirp.io/apiv1/device/5ce86074f699a52cdd72643a/transducer/";
+static const char * const AUTH_HEADER = "Authorization: Basic NWNlODYwNzRmNjk5YTUyY2RkNzI2NDNhOnJVUnp1QllRY3dQZFV5RXY5bGREdktPUmVMbFhtRg==";
 static const char * const USER_AGENT_HEADER = "User-Agent: gridballast1.1";
 
 static system_state_t system_state;
@@ -239,7 +239,7 @@ static int parse_transducer_value(const char *response, const char *transducer_i
     }
 
     int ret = -1;
-
+//    printf("trans id %s val %lf\n", transducer_id, *value);
     cJSON *transducer_array = cJSON_Parse(response);
     if (transducer_array == NULL) {
         goto parse_transducer_value_end;
@@ -250,6 +250,7 @@ static int parse_transducer_value(const char *response, const char *transducer_i
             goto parse_transducer_value_end;
         }
         const cJSON *id_field = cJSON_GetObjectItemCaseSensitive(transducer, "_id");
+        printf("trans id %s\n", id_field->valuestring);
         if (id_field == NULL) {
             goto parse_transducer_value_end;
         }
@@ -261,6 +262,7 @@ static int parse_transducer_value(const char *response, const char *transducer_i
             }
             if (cJSON_IsNumber(value_field)) {
                 *value = value_field->valuedouble;
+				printf("value recvd %lf\n", value_field->valuedouble);
             } else {
                 *value = atof(value_field->valuestring);
             }
@@ -411,6 +413,7 @@ static void wifi_task_fn( void *pv_parameters ) {
         module_mode = MODULE_MODE_NORMAL;
     }
 
+    //module_mode = MODULE_MODE_CONFIG;
     while (1) {
         // loop to allow exiting normal mode and entering config mode
         switch (module_mode) {

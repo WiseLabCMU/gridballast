@@ -35,7 +35,7 @@ system_state_t mystate;
 rwlock_t i2c_lock;
 
 
-int button =0;
+volatile int button =0;
 bool ledState = true;
 int first = 0;
 
@@ -43,6 +43,7 @@ int first = 0;
 
 void IRAM_ATTR mcp_isr_handler(void* arg) {
 
+  //printf("ISR triggered\n");
 
   button=1;
 }
@@ -52,8 +53,7 @@ void mcp_task(void* arg)
 
   while(1){
 
-
-    
+    //printf("button %x\n", button);
     if (button == 1){
   
   
@@ -65,9 +65,9 @@ void mcp_task(void* arg)
     uint8_t pin=getLastInterruptPin();
     uint8_t val=getLastInterruptPinValue();
 
-    // printf("%u ",pin);
-    // printf("%u \n", val );
-     
+    //printf("%u ",pin);
+    //printf("%u \n", val );
+    //printf("button change\n");
      // Here either the button has been pushed or released.
     if ( pin == 0 && val == 0) 
         { //  Test for release - pin pulled high
@@ -134,9 +134,7 @@ void mcp_task(void* arg)
 
        }
         vTaskDelay(500/portTICK_PERIOD_MS);
-         
        }
-
 
 }
 
@@ -163,18 +161,22 @@ void button_init_task( void ) {
   pinMode(3,GPIO_MODE_INPUT);
   pullUp(3,1);
   setupInterruptPin(3,GPIO_INTR_NEGEDGE);
+  //gpio_isr_handler_add(3, mcp_isr_handler, NULL);
 
   pinMode(2,GPIO_MODE_INPUT);
   pullUp(2,1);
   setupInterruptPin(2,GPIO_INTR_NEGEDGE);
+  //gpio_isr_handler_add(2, mcp_isr_handler, NULL);
 
   pinMode(1,GPIO_MODE_INPUT);
   pullUp(1,1);
   setupInterruptPin(1,GPIO_INTR_NEGEDGE);
+  //gpio_isr_handler_add(1, mcp_isr_handler, NULL);
 
   pinMode(0,GPIO_MODE_INPUT);
   pullUp(0,1);
   setupInterruptPin(0,GPIO_INTR_NEGEDGE);
+  //gpio_isr_handler_add(0, mcp_isr_handler, NULL);
 
   //esp32 interrupt initialization on GPIO4
   gpio_set_intr_type(4, GPIO_INTR_NEGEDGE);       
