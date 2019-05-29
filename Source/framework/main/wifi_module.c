@@ -27,6 +27,7 @@
 #include "config.h"
 #include "nvs.h"
 #include "config_server.h"
+#include "Ada_MCP.h"
 
 typedef enum {
     MODULE_MODE_NORMAL,
@@ -38,6 +39,8 @@ typedef enum {
 #define TRANSDUCER_ID_TEMP_TOP    "temp_top"
 #define TRANSDUCER_ID_GRID_FREQ   "grid_frzequency"
 #define TRANSDUCER_ID_SET_POINT   "temp_set"
+#define TRANSDUCER_ID_RELAY_1     "relay_1"
+#define TRANSDUCER_ID_RELAY_2     "relay_2"
 
 const char * const wifi_task_name = "wifi_module_task";
 static const char *TAG = "wifi";
@@ -51,8 +54,8 @@ const int CONNECTED_BIT = BIT0;
 
 /* OpenChirp API definitions */
 static const char * const HOSTNAME = "openchirp.io";
-static const char * const BASE_URL = "https://api.openchirp.io/apiv1/device/5cee9b32f699a52cdd726441/transducer/";
-static const char * const AUTH_HEADER = "Authorization: Basic NWNlZTliMzJmNjk5YTUyY2RkNzI2NDQxOkNzTXp1Y09wQW41aTlnS3R2QlFuYXFPRzZtblFVNQ==";
+static const char * const BASE_URL = "https://api.openchirp.io/apiv1/device/5cd3095dad44f6389e5b2925/transducer/";
+static const char * const AUTH_HEADER = "Authorization: Basic NWNkMzA5NWRhZDQ0ZjYzODllNWIyOTI1OjJRZ3VySm5sNzlEWWI1NFk0d2xZMm9rczNQaXhSZkY=";
 static const char * const USER_AGENT_HEADER = "User-Agent: gridballast1.1";
 
 static system_state_t system_state;
@@ -459,6 +462,33 @@ static void run_mode_normal() {
             get_system_state(&system_state);
             system_state.set_point = set_point;
             set_system_state(&system_state);
+            rwlock_reader_unlock(&system_state_lock);
+        }
+        // get relay_1 setting from open chirp, set in system_state. Toggle relay accordingly
+        double relay_1;
+        if (get_transducer_value(TRANSDUCER_ID_RELAY_1, &relay_1) == 0) {
+            rwlock_reader_lock(&system_state_lock);
+            get_system_state(&system_state);
+            system_state.relay_1 = relay_1;
+            set_system_state(&system_state);
+            printf("Relay 1 status %f", relay_1);
+            begin(0);
+            pinMode(6,GPIO_MODE_OUTPUT); 
+            digitalWrite(6,relay_1);
+            rwlock_reader_unlock(&system_state_lock);
+            
+        }
+        // get relay_2 setting from open chirp, set in system_state. Toggle relay accordingly
+        double relay_2;
+        if (get_transducer_value(TRANSDUCER_ID_RELAY_2, &relay_2) == 0) {
+            rwlock_reader_lock(&system_state_lock);
+            get_system_state(&system_state);
+            system_state.relay_2 = relay_2;
+            set_system_state(&system_state);
+            printf("Relay 2 status %f", system_state.relay_2);
+            begin(0);
+            pinMode(7,GPIO_MODE_OUTPUT); 
+            digitalWrite(7,relay_2);
             rwlock_reader_unlock(&system_state_lock);
         }
 

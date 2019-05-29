@@ -92,7 +92,7 @@ void init_task( void *pv_parameters ) {
      frq_init_task();
      printf("Initializing rs485\n");
 
-     button_init_task();
+    //  button_init_task();
 
      printf("Initializing lcd\n");
      lcd_init_task();
@@ -144,13 +144,17 @@ void app_main( void )
 
     begin(0);
 
-    pinMode(8,GPIO_MODE_OUTPUT);       // test o/p
+    // pinMode(8,GPIO_MODE_OUTPUT);       // test o/p
 
-    digitalWrite(8,0);
+    // digitalWrite(8,0);
 
     vTaskDelay(0.05 / portTICK_PERIOD_MS);
 
-    digitalWrite(8,1);
+  //   begin(0);
+  // pinMode(6,GPIO_MODE_OUTPUT); 
+  //  digitalWrite(6,1);
+  //  pinMode(7,GPIO_MODE_OUTPUT); 
+  //  digitalWrite(7,1);
 
  //Characterize ADC at particular atten
     // esp_adc_cal_characteristics_t *adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));

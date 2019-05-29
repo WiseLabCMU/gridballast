@@ -28,6 +28,8 @@ typedef struct {
   int set_point;
   int heating_status;
   int mode ; // This should be converted to an enum?
+  double relay_1;
+  double relay_2;
 } system_state_t;
 
 #endif /* __system_state_h_ */
