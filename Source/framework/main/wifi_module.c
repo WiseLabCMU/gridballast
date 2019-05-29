@@ -51,8 +51,8 @@ const int CONNECTED_BIT = BIT0;
 
 /* OpenChirp API definitions */
 static const char * const HOSTNAME = "openchirp.io";
-static const char * const BASE_URL = "https://api.openchirp.io/apiv1/device/5ce86074f699a52cdd72643a/transducer/";
-static const char * const AUTH_HEADER = "Authorization: Basic NWNlODYwNzRmNjk5YTUyY2RkNzI2NDNhOnJVUnp1QllRY3dQZFV5RXY5bGREdktPUmVMbFhtRg==";
+static const char * const BASE_URL = "https://api.openchirp.io/apiv1/device/5cee9b32f699a52cdd726441/transducer/";
+static const char * const AUTH_HEADER = "Authorization: Basic NWNlZTliMzJmNjk5YTUyY2RkNzI2NDQxOkNzTXp1Y09wQW41aTlnS3R2QlFuYXFPRzZtblFVNQ==";
 static const char * const USER_AGENT_HEADER = "User-Agent: gridballast1.1";
 
 static system_state_t system_state;
@@ -255,7 +255,10 @@ static int parse_transducer_value(const char *response, const char *transducer_i
             goto parse_transducer_value_end;
         }
 
-        if (strcmp(id_field->valuestring, transducer_id) == 0) {
+        const cJSON *name = cJSON_GetObjectItemCaseSensitive(transducer, "name");
+        printf("trans name %s\n", name->valuestring);
+
+        if (strcmp(name->valuestring, transducer_id) == 0) {
             const cJSON *value_field = cJSON_GetObjectItemCaseSensitive(transducer, "value");
             if (value == NULL) {
                 goto parse_transducer_value_end;
@@ -369,7 +372,7 @@ static int send_data(system_state_t *system_state) {
 
     // only update grid frequency if it is nonzero so we don't push bogus value when
     // the zero crossing circuit is not connected
-    if (system_state->grid_freq > 5.0) {
+    if (err == 0) { //system_state->grid_freq > 5.0) {
         sprintf(data_buf, "%.4f", system_state->grid_freq);
         err = send_transducer_value(TRANSDUCER_ID_GRID_FREQ, data_buf);
     }
@@ -413,7 +416,7 @@ static void wifi_task_fn( void *pv_parameters ) {
         module_mode = MODULE_MODE_NORMAL;
     }
 
-    //module_mode = MODULE_MODE_CONFIG;
+    // module_mode = MODULE_MODE_CONFIG;
     while (1) {
         // loop to allow exiting normal mode and entering config mode
         switch (module_mode) {
