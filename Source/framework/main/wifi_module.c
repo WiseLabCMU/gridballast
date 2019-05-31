@@ -110,6 +110,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 
 /**
  * @brief Common wifi initialization that occurs before the wifi task starts
+ * Sets up hardware
  */
 static void init_wifi(void) {
     tcpip_adapter_init();
@@ -523,7 +524,9 @@ static void run_mode_config() {
 void wifi_init_task( void ) {
 
     printf("Intializing Wifi System...");
+    //Sets up hardware
     init_wifi();
+    //Create Task
     xTaskCreate(
                 &wifi_task_fn, /* task function */
                 wifi_task_name, /* wifi task name */
