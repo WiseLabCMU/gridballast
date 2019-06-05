@@ -473,11 +473,9 @@ static void run_mode_normal() {
             system_state.relay_1 = relay_1;
             set_system_state(&system_state);
             printf("Relay 1 status %f", relay_1);
-            begin(0);
             pinMode(6,GPIO_MODE_OUTPUT); 
             digitalWrite(6,relay_1);
-            rwlock_reader_unlock(&system_state_lock);
-            
+            rwlock_reader_unlock(&system_state_lock);     
         }
         // get relay_2 setting from open chirp, set in system_state. Toggle relay accordingly
         double relay_2;
@@ -487,7 +485,6 @@ static void run_mode_normal() {
             system_state.relay_2 = relay_2;
             set_system_state(&system_state);
             printf("Relay 2 status %f", system_state.relay_2);
-            begin(0);
             pinMode(7,GPIO_MODE_OUTPUT); 
             digitalWrite(7,relay_2);
             rwlock_reader_unlock(&system_state_lock);
