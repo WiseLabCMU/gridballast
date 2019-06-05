@@ -100,7 +100,7 @@ void init_task( void *pv_parameters ) {
      printf("Initialization done\n");
 
     
-     //rs485_init_task();
+    //  rs485_init_task();
 // 
       
 
@@ -142,13 +142,13 @@ void app_main( void )
   // // rwlock_writer_lock(&i2c_lock);
    generic_i2c_master_init (I2C_NUM_1, PIN_SCL, PIN_SDA, I2C_MASTER_FREQ_HZ);
 
-    begin(0);
+    // begin(0);
 
     // pinMode(8,GPIO_MODE_OUTPUT);       // test o/p
 
     // digitalWrite(8,0);
 
-    vTaskDelay(0.05 / portTICK_PERIOD_MS);
+    // vTaskDelay(0.05 / portTICK_PERIOD_MS);
 
   //   begin(0);
   // pinMode(6,GPIO_MODE_OUTPUT); 
