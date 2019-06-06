@@ -61,55 +61,42 @@ rwlock_t i2c_lock;
  *
  * @return void
  */
-
-
-
-
 void init_task( void *pv_parameters ) {
 
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
     
-
     // temporary snippet to change thermostat set point
     rwlock_writer_lock(&system_state_lock);
     get_system_state(&gb_system_state);
     gb_system_state.set_point = 100;
     gb_system_state.threshold_overfrq = 60.01;
     gb_system_state.threshold_underfrq = 59.99;
-    gb_system_state.mode =0;
+    gb_system_state.input_mode = 0;
+	gb_system_state.lcd_display_mode = DISPLAY_INFO;
     set_system_state(&gb_system_state);
     rwlock_writer_unlock(&system_state_lock);
-    
-
-    
+        
     wifi_init_task();
     //sensing_init_task();
     controller_init_task();
 
+    printf("Initializing frq\n");
+    frq_init_task();
+    printf("Initializing rs485\n");
     
-
-     printf("Initializing frq\n");
-     frq_init_task();
-     printf("Initializing rs485\n");
-
-     button_init_task();
-
-     printf("Initializing lcd\n");
-     lcd_init_task();
-        
-     printf("Initialization done\n");
-
+    button_init_task();
     
-     //rs485_init_task();
-// 
-      
+    printf("Initializing lcd\n");
+    lcd_init_task();
+     
+    printf("Initialization done\n");
+    
+    //rs485_init_task();
+    //ct_init_task();
+    
+    //vTaskDelay(500/portTICK_PERIOD_MS);
 
-      //ct_init_task();
-       
-        //vTaskDelay(500/portTICK_PERIOD_MS);
-
-        while(1);
-       
+    while(1);   
 }
     
 
@@ -151,6 +138,7 @@ void app_main( void )
     vTaskDelay(0.05 / portTICK_PERIOD_MS);
 
     digitalWrite(8,1);
+	printf("*********************TOGGLE***********\n");
 
  //Characterize ADC at particular atten
     // esp_adc_cal_characteristics_t *adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));

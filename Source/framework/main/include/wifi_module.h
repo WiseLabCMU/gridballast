@@ -14,6 +14,13 @@
 /** @brief priority of the wifi stack */
 #define wifiUXPriority (2)
 
+
+enum wifi_module_mode_type {
+    MODULE_MODE_NORMAL,
+    MODULE_MODE_CONFIG,
+    WIFI_NO_OF_MODES,
+};
+
 /** @brief name of the wifi task */
 extern const char * const wifi_task_name;
 

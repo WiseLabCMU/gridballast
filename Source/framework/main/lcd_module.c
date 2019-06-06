@@ -17,7 +17,6 @@
 #include "u8g2.h" // LCD driver library
 #include "u8g2_esp32_hal.h" // ESP32 HAL library for u8g2
 #include "util.h"  
-
 #include "button.h"
 
 #define PIN_MCP_RESET 2
@@ -27,106 +26,215 @@
 #define _I2C_MASTER_FREQ_HZ     100000     /* I2C master clock frequency */
 #define TAG "gridballast"
 
-system_state_t mystate;
+static system_state_t mystate;
+static enum lcd_display_type current_display_state;
 
+/* Displays information about current state of variables */
+static void lcd_display_info (system_state_t *mystate, u8g2_t *u8g2) {
+    float freq = mystate->grid_freq;
+    float pwr = mystate->power;
+    int temp_top = mystate->temp_top;
+    int temp_bottom = mystate->temp_bottom;
+	int temp_set_point = mystate->set_point;
+    int mode = mystate->input_mode;
+    int heating_status = mystate->heating_status;
+    char str [32];    
 
-// uint8_t temprature_sens_read(); 
+	rwlock_writer_lock(&i2c_lock);
 
-static void task_lcd(void *arg) 
-{
+	//u8g2_ClearDisplay(u8g2);
+	//u8g2_SendBuffer(u8g2);
+	
+	sprintf(str, "Freq: %2.4fHz", freq);
+	u8g2_DrawStr(u8g2, 10, 10, str);
+	
+	sprintf(str,"Tt:%dF",temp_top);
+	u8g2_DrawStr(u8g2, 10, 60, str);
+	
+	sprintf(str,"Tb:%dF",temp_bottom);
+	u8g2_DrawStr(u8g2, 70, 60, str);
+	
+	sprintf(str,"Ts:%dF",temp_set_point);
+	u8g2_DrawStr(u8g2, 10, 40, str);
+	
+	sprintf(str,"M:%d ",mode);
+	u8g2_DrawStr(u8g2, 70, 40, str);
+		
+	sprintf(str,"P: %2.2f", pwr);
+	u8g2_DrawStr(u8g2, 10, 25, str);
+	
+	sprintf(str, "H:%d", heating_status);
+	u8g2_DrawStr(u8g2,70, 25,str);
+		
+	u8g2_SendBuffer(u8g2);	
+	rwlock_writer_unlock(&i2c_lock);
 
-
-        float freq = 0;
-        float pwr = 0;
-        int t1 = 0;
-        int t2 = 0;
-        int m =0;
-        int ht;
-        int heating_status;
-        char str [32];
-
-
-        // a structure which will contain all the data for one display
-        u8g2_t u8g2;
-
-        // initialize u8g2 structure
-        u8g2_Setup_ssd1309_i2c_128x64_noname0_f(&u8g2, U8G2_R0, u8g2_esp32_i2c_byte_cb, u8g2_esp32_gpio_and_delay_cb);
-        u8x8_SetI2CAddress(&u8g2.u8x8, 0x78);
-
-        
-        // send init sequence to the display, display is in sleep mode after this,
-        u8g2_InitDisplay(&u8g2);
-        //wake up display
-        u8g2_SetPowerSave(&u8g2, 0);
-        u8g2_SetContrast(&u8g2, 100);
-        u8g2_SetFlipMode(&u8g2, 1);
-
-      while(1)
-        {
-          // read system state to access state variables for display
-
-          rwlock_reader_lock(&system_state_lock);
-          get_system_state(&mystate);
-          rwlock_reader_unlock(&system_state_lock);
-
-          freq = mystate.grid_freq;
-          t1 = mystate.temp_top;
-          t2 = mystate.temp_bottom;
-          pwr = mystate.power;
-
-          m = mystate.mode;
-
-          ht = mystate.heating_status;
-
-          int sp = mystate.set_point;
-        //ESP_LOGI("lcd", "the t bottom is %d\n",t2);
-        rwlock_writer_lock(&i2c_lock);
-
-        // 
-         u8x8_SetI2CAddress(&u8g2.u8x8, 0x78);
-
-          u8g2_ClearBuffer(&u8g2);
-
-
-          u8g2_SetFont(&u8g2,u8g2_font_t0_13_te);
-            sprintf(str, "Freq: %2.4fHz", freq);
-
-          u8g2_DrawStr(&u8g2, 10, 10, str);
-        
-          sprintf(str,"Tt:%dF",t1);
-          u8g2_DrawStr(&u8g2, 10, 60, str);
-        
-          sprintf(str,"Tb:%dF",t2);
-          u8g2_DrawStr(&u8g2, 70, 60, str);
-        
-          sprintf(str,"Ts:%dF",sp);
-          u8g2_DrawStr(&u8g2, 10, 40, str);
-
-         
-          sprintf(str,"Mode:%d ",m);
-          u8g2_DrawStr(&u8g2, 70, 40, str);
-          
-
-          sprintf(str,"Power: %2.2f", pwr);
-          u8g2_DrawStr(&u8g2, 10, 25, str);
-
-          sprintf(str, "Heat:%d", ht);
-          u8g2_DrawStr(&u8g2,70, 25,str);
-
-
-          
-          u8g2_SendBuffer(&u8g2);
-
-          rwlock_writer_unlock(&i2c_lock);
-
-           //printf("ESP32 onchip Temperature = %d\n", temprature_sens_read());
-
-        }
 }
 
+
+static void lcd_change_reception_mode(system_state_t *mystate, u8g2_t *u8g2) {
+    char str[32];
+	rwlock_writer_lock(&i2c_lock);
+	
+	sprintf(str, "Input Mode:");	
+    u8g2_DrawStr(u8g2, 5, 10, str);
+	
+	sprintf(str, "Mode 0 - Button");	
+    u8g2_DrawStr(u8g2, 5, 25, str);
+
+	sprintf(str, "Mode 1 - OpenChirp");	
+    u8g2_DrawStr(u8g2, 10, 40, str);
+
+	sprintf(str, "Current Mode:%d", mystate->input_mode);
+    u8g2_DrawStr(u8g2, 10, 55, str);
+
+	u8g2_SendBuffer(u8g2);
+	rwlock_writer_unlock(&i2c_lock);
+}
+	
+
+/* 
+    lcd_change_temp_mode
+*/
+static void lcd_change_temp_mode(system_state_t *mystate, u8g2_t *u8g2) {
+    char str[32];
+	
+	//u8g2_ClearBuffer(&u8g2);    
+    // initialize u8g2 structure
+    /*u8g2_Setup_ssd1309_i2c_128x64_noname0_f(&u8g2, U8G2_R0, u8g2_esp32_i2c_byte_cb, u8g2_esp32_gpio_and_delay_cb);
+    u8x8_SetI2CAddress(&u8g2.u8x8, 0x78);
+    
+    // send init sequence to the display, display is in sleep mode after this,
+    u8g2_InitDisplay(&u8g2);
+
+	//wake up display
+    u8g2_SetPowerSave(&u8g2, 0);
+    u8g2_SetContrast(&u8g2, 100);
+    u8g2_SetFlipMode(&u8g2, 1);
+	
+	u8g2_SetFont(&u8g2,u8g2_font_t0_13_te);*/
+
+
+	rwlock_writer_lock(&i2c_lock);
+	
+    //u8g2_ClearBuffer(u8g2);
+	//u8g2_SendBuffer(u8g2);
+	
+	sprintf(str, "Temperature Set:");
+	u8g2_DrawStr(u8g2, 5, 10, str);	
+
+    sprintf(str, "%dF", mystate->set_point);
+	u8g2_DrawStr(u8g2, 5, 30, str);
+
+	u8g2_SendBuffer(u8g2);
+	
+	rwlock_writer_unlock(&i2c_lock);
+}
+
+static void lcd_change_wifi_config(system_state_t *mystate, u8g2_t *u8g2) {
+    char str[32];
+    rwlock_writer_lock(&i2c_lock);
+	sprintf(str, "Wifi config");
+	u8g2_DrawStr(u8g2, 10, 10, str);	
+
+    sprintf(str, "Enter Wifi details");
+	u8g2_DrawStr(u8g2, 10, 30, str);
+
+	sprintf(str, "and reboot GB");
+	u8g2_DrawStr(u8g2, 10, 50, str);
+
+	u8g2_SendBuffer(u8g2);
+
+    rwlock_writer_unlock(&i2c_lock);
+}
+
+/*
+ task_lcd - handler function for the LCD task.
+            Displays the relevant information on the LCD 
+            depending on the value of gb_system_state.display
+            Below information is displayed based on this value -
+            display 0 - 
+*/            
+static void task_lcd(void *arg) 
+{       
+     // a structure which will contain all the data for one display
+    u8g2_t u8g2;
+	
+	//u8g2_ClearBuffer(&u8g2);    
+    // initialize u8g2 structure
+    u8g2_Setup_ssd1309_i2c_128x64_noname0_f(&u8g2, U8G2_R0, u8g2_esp32_i2c_byte_cb, u8g2_esp32_gpio_and_delay_cb);
+    u8x8_SetI2CAddress(&u8g2.u8x8, 0x78);
+    
+    // send init sequence to the display, display is in sleep mode after this,
+    u8g2_InitDisplay(&u8g2);
+
+	//wake up display
+    u8g2_SetPowerSave(&u8g2, 0);
+    u8g2_SetContrast(&u8g2, 100);
+    u8g2_SetFlipMode(&u8g2, 1);
+	
+	u8g2_SetFont(&u8g2,u8g2_font_t0_13_te);
+
+	u8g2_ClearDisplay(&u8g2);
+	u8g2_SendBuffer(&u8g2);
+	//this is done so that the check in the first switch case fails for the first time
+	//on boot up
+    current_display_state = NO_OF_LCD_SETTINGS;
+    while(1)
+    {
+        //read system state to access state variables for display
+        rwlock_reader_lock(&system_state_lock);
+        get_system_state(&mystate);
+        rwlock_reader_unlock(&system_state_lock);
+        
+		//determine the lcd display_mode
+		switch (mystate.lcd_display_mode) {
+            case DISPLAY_INFO:
+				if (current_display_state != DISPLAY_INFO) {
+					current_display_state = DISPLAY_INFO;
+				    u8g2_ClearDisplay(&u8g2);
+				    u8g2_SendBuffer(&u8g2);
+				}
+				lcd_display_info(&mystate, &u8g2);
+		        break;
+		    case CHANGE_TEMP_SET_POINT:
+				if (current_display_state != CHANGE_TEMP_SET_POINT) {
+					current_display_state = CHANGE_TEMP_SET_POINT;
+				    u8g2_ClearDisplay(&u8g2);
+				    u8g2_SendBuffer(&u8g2);
+				}
+				lcd_change_temp_mode(&mystate, &u8g2);
+				break;
+			case CHANGE_RECEPTION_MODE:
+				if (current_display_state != CHANGE_RECEPTION_MODE) {
+					current_display_state = CHANGE_RECEPTION_MODE;
+				    u8g2_ClearDisplay(&u8g2);
+				    u8g2_SendBuffer(&u8g2);
+				}
+				lcd_change_reception_mode(&mystate, &u8g2);
+				break;
+			case CHANGE_WIFI_CONFIG:
+				if (current_display_state != CHANGE_WIFI_CONFIG) {
+					current_display_state = CHANGE_WIFI_CONFIG;
+				    u8g2_ClearDisplay(&u8g2);
+				    u8g2_SendBuffer(&u8g2);
+				}
+				lcd_change_wifi_config(&mystate, &u8g2);
+				break;
+			default:
+				assert(0);
+			    break;
+		}    
+    }
+}
+
+
+/*Creates a task to handle what is displayed on the LCD screen
+  Input - none
+  Output - none
+*/
 void lcd_init_task( void ) 
 {
-
-
-	xTaskCreate(task_lcd, "lcd_task", 4096, NULL, 10, NULL);
+    xTaskCreate(task_lcd, "lcd_task", 4096, NULL, 10, NULL);
 }
+

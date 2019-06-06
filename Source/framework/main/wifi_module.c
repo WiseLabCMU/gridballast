@@ -28,11 +28,6 @@
 #include "nvs.h"
 #include "config_server.h"
 
-typedef enum {
-    MODULE_MODE_NORMAL,
-    MODULE_MODE_CONFIG
-} module_mode_t;
-
 /* OpenChirp transducer ids for system state fields */
 #define TRANSDUCER_ID_TEMP_BOTTOM "temp_bottom"
 #define TRANSDUCER_ID_TEMP_TOP    "temp_top"
@@ -42,10 +37,11 @@ typedef enum {
 const char * const wifi_task_name = "wifi_module_task";
 static const char *TAG = "wifi";
 
-static volatile module_mode_t module_mode;
+static volatile enum wifi_module_mode_type module_mode;
 
 /** @brief FreeRTOS event group to signal when softap is up */
 static EventGroupHandle_t wifi_event_group;
+const int NORMAL_TO_CONFIG_SWITCH_BIT = BIT2;
 const int SOFTAP_UP_BIT = BIT1;
 const int CONNECTED_BIT = BIT0;
 
@@ -66,6 +62,16 @@ static void run_mode_config();
  * @brief Wifi event handler
  */
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
+
+    //lets first check if user wants to reconfig the wifi
+    // read system state into local copy
+    rwlock_reader_lock(&system_state_lock);
+    get_system_state(&system_state);
+    rwlock_reader_unlock(&system_state_lock);
+	if (system_state.lcd_display_mode == CHANGE_WIFI_CONFIG) {
+		xEventGroupSetBits(wifi_event_group, NORMAL_TO_CONFIG_SWITCH_BIT);
+	}
+
     switch(event->event_id) {
     case SYSTEM_EVENT_AP_START:
         ESP_LOGI(TAG, "Got event AP_START");
@@ -108,7 +114,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 /**
  * @brief Common wifi initialization that occurs before the wifi task starts
  */
-static void init_wifi(void) {
+ static void init_wifi(void) {
     tcpip_adapter_init();
 
     wifi_event_group = xEventGroupCreate();
@@ -419,6 +425,13 @@ static void wifi_task_fn( void *pv_parameters ) {
     // module_mode = MODULE_MODE_CONFIG;
     while (1) {
         // loop to allow exiting normal mode and entering config mode
+        // read system state into local copy
+        rwlock_reader_lock(&system_state_lock);
+        get_system_state(&system_state);
+        rwlock_reader_unlock(&system_state_lock);
+		if (system_state.lcd_display_mode == CHANGE_WIFI_CONFIG) {
+			module_mode = MODULE_MODE_CONFIG;
+		}
         switch (module_mode) {
             case MODULE_MODE_NORMAL:
                 init_mode_sta(ssid, pass);
@@ -428,45 +441,62 @@ static void wifi_task_fn( void *pv_parameters ) {
                 init_mode_ap();
                 run_mode_config();
                 break;
+			default:
+				assert(0);
+				break;
         }
         ESP_ERROR_CHECK(esp_wifi_stop());
     }
 }
 
+
 static void run_mode_normal() {
     reset_transducer_response();
     ESP_LOGI(TAG, "Running normal mode");
+	EventBits_t event_bit_mask;
     while (module_mode == MODULE_MODE_NORMAL) {
         /* Wait for the callback to set the CONNECTED_BIT in the
            event group.
         */
-        xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
-                            false, true, portMAX_DELAY);
-        ESP_LOGI(TAG, "Connected to AP");
+        
+		/*if (system_state.lcd_display_mode == CHANGE_WIFI_CONFIG) {
+			module_mode = MODULE_MODE_CONFIG;
+			break;
+		}*/
 
-        // read system state into local copy
-        rwlock_reader_lock(&system_state_lock);
-        get_system_state(&system_state);
-        rwlock_reader_unlock(&system_state_lock);
-
-        // send data to openchirp
-        send_data(&system_state);
-
-        // get data from openchirp
-        double set_point;
-        if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
+        event_bit_mask = xEventGroupWaitBits(wifi_event_group, NORMAL_TO_CONFIG_SWITCH_BIT | CONNECTED_BIT,
+                            false, false, portMAX_DELAY);
+        if (event_bit_mask & NORMAL_TO_CONFIG_SWITCH_BIT) {
+            module_mode = MODULE_MODE_CONFIG;
+			xEventGroupClearBits(wifi_event_group, NORMAL_TO_CONFIG_SWITCH_BIT);
+			continue;
+		}
+		else {
+    	    // read system state into local copy
             rwlock_reader_lock(&system_state_lock);
             get_system_state(&system_state);
-            system_state.set_point = set_point;
-            set_system_state(&system_state);
             rwlock_reader_unlock(&system_state_lock);
-        }
-
-        for (int countdown = 9; countdown >= 0; countdown--) {
-            ESP_LOGI(TAG, "%d... ", countdown);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-        }
-        ESP_LOGI(TAG, "Starting again!");
+    		
+            ESP_LOGI(TAG, "Connected to AP");
+            // send data to openchirp
+            send_data(&system_state);
+    
+            // get data from openchirp
+            double set_point;
+            if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
+                rwlock_reader_lock(&system_state_lock);
+                get_system_state(&system_state);
+                system_state.set_point = set_point;
+                set_system_state(&system_state);
+                rwlock_reader_unlock(&system_state_lock);
+            }
+    
+            for (int countdown = 9; countdown >= 0; countdown--) {
+                ESP_LOGI(TAG, "%d... ", countdown);
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+            }
+            ESP_LOGI(TAG, "Starting again!");
+		}
     }
 }
 

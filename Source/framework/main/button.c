@@ -16,6 +16,7 @@
 #include "freertos/task.h"
 #include "rwlock.h"
 #include "util.h"
+#include "button.h"
 
 /*work under progress*/
 #define ESP_INTR_FLAG_DEFAULT 0
@@ -36,107 +37,127 @@ rwlock_t i2c_lock;
 
 
 volatile int button =0;
+uint8_t retry_counter = 0;
 bool ledState = true;
 int first = 0;
 
 
 
 void IRAM_ATTR mcp_isr_handler(void* arg) {
-
-  //printf("ISR triggered\n");
-
   button=1;
+}
+
+void disable_mcp_intr() {
+    updateRegisterBit(0, 0, MCP23017_GPINTENA, MCP23017_GPINTENB);
+	updateRegisterBit(1, 0, MCP23017_GPINTENA, MCP23017_GPINTENB);
+	updateRegisterBit(2, 0, MCP23017_GPINTENA, MCP23017_GPINTENB);
+	updateRegisterBit(3, 0, MCP23017_GPINTENA, MCP23017_GPINTENB);
+}
+
+void enable_mcp_intr() {
+    updateRegisterBit(0, 1, MCP23017_GPINTENA, MCP23017_GPINTENB);
+	updateRegisterBit(1, 1, MCP23017_GPINTENA, MCP23017_GPINTENB);
+	updateRegisterBit(2, 1, MCP23017_GPINTENA, MCP23017_GPINTENB);
+	updateRegisterBit(3, 1, MCP23017_GPINTENA, MCP23017_GPINTENB);
 }
 
 void mcp_task(void* arg) 
 {
-
   while(1){
-
-    //printf("button %x\n", button);
-    if (button == 1){
-  
-  
-
-    begin(0);
-
-    vTaskDelay(300/portTICK_PERIOD_MS);
-
-    uint8_t pin=getLastInterruptPin();
-    uint8_t val=getLastInterruptPinValue();
-
-    //printf("%u ",pin);
-    //printf("%u \n", val );
-    //printf("button change\n");
-     // Here either the button has been pushed or released.
-    if ( pin == 0 && val == 0) 
-        { //  Test for release - pin pulled high
-     
+    if (button == 1){ 
+        uint8_t pin=getLastInterruptPin();
+        uint8_t val=getLastInterruptPinValue();
+	    //gpio_intr_disable(4);
+		disable_mcp_intr();
+		begin(0);
+        //printf("%u ",pin);
+        //printf("%u \n", val );
+		//printf("Raise port high begin\n");
+		//vTaskDelay(2000/portTICK_PERIOD_MS);
+		//printf("Raise port high end\n");
+		//vTaskDelay(300/portTICK_PERIOD_MS);
+        //printf("button change\n");
+         // Here either the button has been pushed or released.
+        if ( pin == S1 && val == 0) { //  Test for release - pin pulled high
             button = 0;
-
-
-        rwlock_reader_lock(&system_state_lock);
-        get_system_state(&mystate);
-        rwlock_reader_unlock(&system_state_lock);
-
-          
-          if ( mystate.mode == 0)
-          {
-            rwlock_writer_lock(&system_state_lock);
-            get_system_state(&gb_system_state);
-            gb_system_state.set_point ++ ;
-            set_system_state(&gb_system_state);
-            rwlock_writer_unlock(&system_state_lock);
-          }
-
-
-        }
-
-        if( pin == 2 && val == 0)
-        {
-            button = 0;
-
-          if ( mystate.mode == 0)
-          {
+            rwlock_reader_lock(&system_state_lock);
+            get_system_state(&mystate);
+            rwlock_reader_unlock(&system_state_lock);  
+    		if ((mystate.input_mode == BUTTON_INPUT) &&
+               (mystate.lcd_display_mode == CHANGE_TEMP_SET_POINT)) {
                 rwlock_writer_lock(&system_state_lock);
-                get_system_state(&gb_system_state);
-                gb_system_state.set_point -- ;
-                set_system_state(&gb_system_state);
+                get_system_state(&mystate);
+                mystate.set_point++;
+                set_system_state(&mystate);
                 rwlock_writer_unlock(&system_state_lock);
-           }
-
+            }
+    		else if (mystate.lcd_display_mode == CHANGE_RECEPTION_MODE) {
+    			rwlock_writer_lock(&system_state_lock);
+    			get_system_state(&mystate);
+    		    mystate.input_mode += 1;
+    			mystate.input_mode %= BUTTON_NO_OF_MODES;
+    		    set_system_state(&mystate);
+    			rwlock_writer_unlock(&system_state_lock);
+    	    }
         }
-
-         if( pin == 1 && val == 0)
-        {
+        else if( pin == S2 && val == 0) {
             button = 0;
             rwlock_writer_lock(&system_state_lock);
-        get_system_state(&gb_system_state);
-        gb_system_state.mode = 0;
-        set_system_state(&gb_system_state);
-        rwlock_writer_unlock(&system_state_lock);
-
+            get_system_state(&mystate);
+            mystate.lcd_display_mode--;
+    		mystate.lcd_display_mode += NO_OF_LCD_SETTINGS;
+    		mystate.lcd_display_mode %= NO_OF_LCD_SETTINGS;
+            set_system_state(&mystate);
+            rwlock_writer_unlock(&system_state_lock);
         }
-
-         if( pin == 3 && val == 0)
-        {
+    
+        else if( pin == S3 && val == 0) {
             button = 0;
-
-          
-        rwlock_writer_lock(&system_state_lock);
-        get_system_state(&gb_system_state);
-        gb_system_state.mode = 1;
-        set_system_state(&gb_system_state);
-        rwlock_writer_unlock(&system_state_lock);
-
+            rwlock_writer_lock(&system_state_lock);
+            get_system_state(&mystate);
+            mystate.lcd_display_mode++;
+    		mystate.lcd_display_mode %= NO_OF_LCD_SETTINGS;
+            set_system_state(&mystate);
+            rwlock_writer_unlock(&system_state_lock);
         }
-
-
-       }
-        vTaskDelay(500/portTICK_PERIOD_MS);
-       }
-
+    
+        else if( pin == S4 && val == 0) {
+        	button = 0;
+        	rwlock_reader_lock(&system_state_lock);
+        	get_system_state(&mystate);
+        	rwlock_reader_unlock(&system_state_lock);  
+        	if ((mystate.input_mode == BUTTON_INPUT) &&
+               (mystate.lcd_display_mode == CHANGE_TEMP_SET_POINT)) {
+        		rwlock_writer_lock(&system_state_lock);
+        		get_system_state(&mystate);
+        		mystate.set_point-- ;
+        		set_system_state(&mystate);
+        		rwlock_writer_unlock(&system_state_lock);
+            }
+            else if (mystate.lcd_display_mode == CHANGE_RECEPTION_MODE) {
+        	    rwlock_writer_lock(&system_state_lock);
+        		get_system_state(&mystate);
+        		mystate.input_mode -= 1;
+        		mystate.input_mode += BUTTON_NO_OF_MODES;
+    			mystate.input_mode %= BUTTON_NO_OF_MODES;
+        		set_system_state(&mystate);
+        		rwlock_writer_unlock(&system_state_lock);
+        	}
+        }
+		else {
+			//we got an error
+			retry_counter++;
+			if (retry_counter > 5) {
+				//time to reset the chip y'all
+				//TODO_Sharan
+			}
+		}
+		enable_mcp_intr();
+   } 
+   vTaskDelay(500/portTICK_PERIOD_MS);
+ }   
 }
+
 
 
 
@@ -149,11 +170,11 @@ void button_init_task( void ) {
 
   begin(0);
 
-  pinMode(4,GPIO_MODE_OUTPUT); 
+  /*pinMode(4,GPIO_MODE_OUTPUT); 
    digitalWrite(4,0);
 
   gpio_pad_select_gpio(13);
-  gpio_set_direction(13, GPIO_MODE_OUTPUT);
+  gpio_set_direction(13, GPIO_MODE_OUTPUT);*/
 
 
    //I/O expander interrupt initialization
@@ -184,7 +205,7 @@ void button_init_task( void ) {
 
 
 
-  xTaskCreatePinnedToCore(mcp_task, "mcp_task", 1024, NULL, 7, NULL,0);
+  xTaskCreatePinnedToCore(mcp_task, "mcp_task", 16384, NULL, 11, NULL,0);
 
 
 
