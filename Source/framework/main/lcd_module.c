@@ -83,10 +83,10 @@ static void lcd_change_reception_mode(system_state_t *mystate, u8g2_t *u8g2) {
     u8g2_DrawStr(u8g2, 5, 25, str);
 
 	sprintf(str, "Mode 1 - OpenChirp");	
-    u8g2_DrawStr(u8g2, 10, 40, str);
+    u8g2_DrawStr(u8g2, 5, 40, str);
 
 	sprintf(str, "Current Mode:%d", mystate->input_mode);
-    u8g2_DrawStr(u8g2, 10, 55, str);
+    u8g2_DrawStr(u8g2, 5, 55, str);
 
 	u8g2_SendBuffer(u8g2);
 	rwlock_writer_unlock(&i2c_lock);
@@ -134,14 +134,14 @@ static void lcd_change_temp_mode(system_state_t *mystate, u8g2_t *u8g2) {
 static void lcd_change_wifi_config(system_state_t *mystate, u8g2_t *u8g2) {
     char str[32];
     rwlock_writer_lock(&i2c_lock);
-	sprintf(str, "Wifi config");
-	u8g2_DrawStr(u8g2, 10, 10, str);	
+	sprintf(str, "SSID: gridballast");
+	u8g2_DrawStr(u8g2, 5, 10, str);	
 
-    sprintf(str, "Enter Wifi details");
-	u8g2_DrawStr(u8g2, 10, 30, str);
+    sprintf(str, "IP: 192.168.4.1");
+	u8g2_DrawStr(u8g2, 5, 25, str);
 
-	sprintf(str, "and reboot GB");
-	u8g2_DrawStr(u8g2, 10, 50, str);
+	sprintf(str, "to setup wifi");
+	u8g2_DrawStr(u8g2, 5, 40, str);
 
 	u8g2_SendBuffer(u8g2);
 
