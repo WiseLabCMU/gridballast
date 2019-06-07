@@ -5,6 +5,7 @@
  *
  * @author Vikram Shanker (vshanker@cmu.edu)
  * @author Rohit Garg (rohitg1@andrew.cmu.edu)
+ * @author Sharan Turlapati (sharant@andrew.cmu.edu)
  */
 
 #ifndef __button_h_
