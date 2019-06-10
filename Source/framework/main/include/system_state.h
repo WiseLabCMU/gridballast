@@ -30,6 +30,8 @@ typedef struct {
   int heating_status;
   int input_mode ; // This should be converted to an enum?
   enum lcd_display_type lcd_display_mode;
+  double relay_1;
+  double relay_2;
 } system_state_t;
 
 #endif /* __system_state_h_ */
