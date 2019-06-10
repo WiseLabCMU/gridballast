@@ -61,55 +61,42 @@ rwlock_t i2c_lock;
  *
  * @return void
  */
-
-
-
-
 void init_task( void *pv_parameters ) {
 
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
     
-
     // temporary snippet to change thermostat set point
     rwlock_writer_lock(&system_state_lock);
     get_system_state(&gb_system_state);
     gb_system_state.set_point = 100;
     gb_system_state.threshold_overfrq = 60.01;
     gb_system_state.threshold_underfrq = 59.99;
-    gb_system_state.mode =0;
+    gb_system_state.input_mode = 0;
+	gb_system_state.lcd_display_mode = DISPLAY_INFO;
     set_system_state(&gb_system_state);
     rwlock_writer_unlock(&system_state_lock);
-    
-
-    
+        
     wifi_init_task();
     //sensing_init_task();
     controller_init_task();
 
+    printf("Initializing frq\n");
+    frq_init_task();
+    printf("Initializing rs485\n");
     
-
-     printf("Initializing frq\n");
-     frq_init_task();
-     printf("Initializing rs485\n");
-
-    //  button_init_task();
-
-     printf("Initializing lcd\n");
-     lcd_init_task();
-        
-     printf("Initialization done\n");
-
+    button_init_task();
     
-    //  rs485_init_task();
-// 
-      
+    printf("Initializing lcd\n");
+    lcd_init_task();
+     
+    printf("Initialization done\n");
+    
+    //rs485_init_task();
+    //ct_init_task();
+    
+    //vTaskDelay(500/portTICK_PERIOD_MS);
 
-      //ct_init_task();
-       
-        //vTaskDelay(500/portTICK_PERIOD_MS);
-
-        while(1);
-       
+    while(1);   
 }
     
 
@@ -142,20 +129,16 @@ void app_main( void )
   // // rwlock_writer_lock(&i2c_lock);
    generic_i2c_master_init (I2C_NUM_1, PIN_SCL, PIN_SDA, I2C_MASTER_FREQ_HZ);
 
-    // begin(0);
+    begin(0);
 
-    // pinMode(8,GPIO_MODE_OUTPUT);       // test o/p
+    pinMode(8,GPIO_MODE_OUTPUT);       // test o/p
 
-    // digitalWrite(8,0);
+    digitalWrite(8,0);
 
-    // vTaskDelay(0.05 / portTICK_PERIOD_MS);
+    vTaskDelay(0.05 / portTICK_PERIOD_MS);
 
-  //   begin(0);
-  // pinMode(6,GPIO_MODE_OUTPUT); 
-  //  digitalWrite(6,1);
-  //  pinMode(7,GPIO_MODE_OUTPUT); 
-  //  digitalWrite(7,1);
-
+    digitalWrite(8,1);
+	
  //Characterize ADC at particular atten
     // esp_adc_cal_characteristics_t *adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
     // esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_9, 1100, adc_chars);
