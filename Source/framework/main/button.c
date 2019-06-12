@@ -92,7 +92,7 @@ void mcp_task(void* arg)
 		//than LCD. Therefore all button interrupts are disabled whilst we are trying to process one so that the
 		//line stays high. This seems to work well.
 		disable_mcp_intr();
-		begin(0);
+		// begin(0);
         //Make sure the button is released
         if ( pin == S1 && val == 0) {
             button = 0;
