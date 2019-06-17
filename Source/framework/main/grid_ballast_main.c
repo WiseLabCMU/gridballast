@@ -89,11 +89,10 @@ void init_task( void *pv_parameters ) {
     printf("Initializing lcd\n");
     lcd_init_task();
      
-    printf("Initialization done\n");
     
     //rs485_init_task();
-    //ct_init_task();
-    
+    ct_init_task();
+    printf("Initialization done\n");    
     //vTaskDelay(500/portTICK_PERIOD_MS);
 
     while(1);   

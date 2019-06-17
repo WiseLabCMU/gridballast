@@ -51,7 +51,7 @@ static void lcd_display_info (system_state_t *mystate, u8g2_t *u8g2) {
 	u8g2_DrawStr(u8g2, 10, 25, str);
 	
 	sprintf(str, "H:%d", heating_status);
-	u8g2_DrawStr(u8g2, 80, 25, str);
+	u8g2_DrawStr(u8g2, 95, 25, str);
 
 	sprintf(str,"Ts:%dF",temp_set_point);
 	u8g2_DrawStr(u8g2, 10, 40, str);

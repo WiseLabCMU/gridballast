@@ -66,6 +66,9 @@ static void reset_transducer_response();
 static void run_mode_normal();
 static void run_mode_config();
 
+TaskHandle_t wifi_task_handler;
+
+
 /**
  * @brief Wifi event handler
  */
@@ -568,7 +571,7 @@ void wifi_init_task( void ) {
                 wifiUSStackDepth, /* stack depth */
                 NULL, /* parameters to fn_name */
                 wifiUXPriority, /* task priority */
-                NULL /* task handle ( returns an id basically ) */
+                &wifi_task_handler /* task handle ( returns an id basically ) */
                );
     fflush(stdout);
 }
