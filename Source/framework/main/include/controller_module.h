@@ -12,7 +12,7 @@
 /** @brief depth of the controller stack */
 #define controllerUSStackDepth ((unsigned short) 2048) /* bytes */
 /** @brief priority of the controller stack */
-#define controllerUXPriority (2)
+#define controllerUXPriority (3)
 
 /** @brief name of the controller task */
 extern const char * const controller_task_name;
