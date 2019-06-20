@@ -113,6 +113,8 @@ void mcp_task(void* arg)
     		    mystate.input_mode += 1;
     			mystate.input_mode %= BUTTON_NO_OF_MODES;
     		    set_system_state(&mystate);
+                // printf("my display mode is %d", mystate.lcd_display_mode);
+                // printf("input mode is %i", mystate.input_mode);
     			rwlock_writer_unlock(&system_state_lock);
     	    }
         }
@@ -124,6 +126,8 @@ void mcp_task(void* arg)
     		mystate.lcd_display_mode += NO_OF_LCD_SETTINGS;
     		mystate.lcd_display_mode %= NO_OF_LCD_SETTINGS;
             set_system_state(&mystate);
+            // printf("my display mode is %d", mystate.lcd_display_mode);
+            // printf("input mode is %i", mystate.input_mode);
             rwlock_writer_unlock(&system_state_lock);
         }
         else if( pin == S3 && val == 0) {
@@ -133,6 +137,8 @@ void mcp_task(void* arg)
             mystate.lcd_display_mode++;
     		mystate.lcd_display_mode %= NO_OF_LCD_SETTINGS;
             set_system_state(&mystate);
+            // printf("my display mode is %d", mystate.lcd_display_mode);
+            // printf("input mode is %i", mystate.input_mode);
             rwlock_writer_unlock(&system_state_lock);
         }    
         else if( pin == S4 && val == 0) {
@@ -155,6 +161,8 @@ void mcp_task(void* arg)
         		mystate.input_mode += BUTTON_NO_OF_MODES;
     			mystate.input_mode %= BUTTON_NO_OF_MODES;
         		set_system_state(&mystate);
+                // printf("my display mode is %d", mystate.lcd_display_mode);
+                // printf("input mode is %i", mystate.input_mode);
         		rwlock_writer_unlock(&system_state_lock);
         	}
         }
@@ -169,7 +177,7 @@ void mcp_task(void* arg)
 		}
 		enable_mcp_intr();
    } 
-   vTaskDelay(500/portTICK_PERIOD_MS);
+   vTaskDelay(1000/portTICK_PERIOD_MS);
  }   
 }
 
