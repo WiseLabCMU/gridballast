@@ -20,6 +20,7 @@
 #include "rwlock.h"
 #include "util.h"
 #include "button.h"
+#include "wifi_module.h"
 
 #define ESP_INTR_FLAG_DEFAULT 0
 
@@ -105,6 +106,9 @@ void mcp_task(void* arg)
                 get_system_state(&mystate);
                 mystate.set_point++;
                 set_system_state(&mystate);
+                //Send Data to openchirp, so now openchirp reads from buttons pressed
+                printf("SENDING NEW TEMP SET!!!!!!!!!!!!!!!!\n"); 
+                send_temp_set_wrapper();
                 rwlock_writer_unlock(&system_state_lock);
             }
     		else if (mystate.lcd_display_mode == CHANGE_RECEPTION_MODE) {
@@ -152,6 +156,9 @@ void mcp_task(void* arg)
         		get_system_state(&mystate);
         		mystate.set_point-- ;
         		set_system_state(&mystate);
+                //Send Data to openchirp, so now openchirp reads from buttons pressed 
+                printf("SENDING NEW TEMP SET!!!!!!!!!!!!!!!!\n");
+                send_temp_set_wrapper();
         		rwlock_writer_unlock(&system_state_lock);
             }
             else if (mystate.lcd_display_mode == CHANGE_RECEPTION_MODE) {
@@ -177,7 +184,7 @@ void mcp_task(void* arg)
 		}
 		enable_mcp_intr();
    } 
-   vTaskDelay(1000/portTICK_PERIOD_MS);
+   vTaskDelay(800/portTICK_PERIOD_MS);
  }   
 }
 

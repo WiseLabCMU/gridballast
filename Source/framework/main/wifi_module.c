@@ -483,23 +483,22 @@ static void run_mode_normal() {
 		}
 
         ESP_LOGI(TAG, "Connected to AP");
-		send_data(&system_state);
+		// send_data(&system_state);
         //Work in progress
         // send data to openchirp if manual mode, then recieve from open chirp
-        // if (system_state.input_mode == 0){
-        //     send_data(&system_state);
-
-        //     // get data from openchirp
-        //     double set_point;
-        //     if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
-        //         rwlock_reader_lock(&system_state_lock);
-        //         get_system_state(&system_state);
-        //         system_state.set_point = set_point;
-        //         set_system_state(&system_state);
-        //         printf("System set point is %i", system_state.set_point);
-        //         rwlock_reader_unlock(&system_state_lock);
-        //     }
-        // }
+        if (system_state.input_mode == 0){
+            // get data from openchirp
+            double set_point;
+            if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
+                rwlock_reader_lock(&system_state_lock);
+                get_system_state(&system_state);
+                system_state.set_point = set_point;
+                set_system_state(&system_state);
+                printf("System set point is %i", system_state.set_point);
+                rwlock_reader_unlock(&system_state_lock);
+            }
+            send_data(&system_state);
+        }
         // get relay_1 setting from open chirp, set in system_state. Toggle relay accordingly
         double relay_1;
         if (get_transducer_value(TRANSDUCER_ID_RELAY_1, &relay_1) == 0) {
@@ -525,19 +524,20 @@ static void run_mode_normal() {
             rwlock_reader_unlock(&system_state_lock);
         }
 
-        // if openchirp mode, first get data from open chirp, then send
+        // if full auto mode, get send current state first
         if (system_state.input_mode == 1){
-            // get data from openchirp
-            double set_point;
-            if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
-                rwlock_reader_lock(&system_state_lock);
-                get_system_state(&system_state);
-                system_state.set_point = set_point;
-                set_system_state(&system_state);
-                printf("System set point is %i", system_state.set_point);
-                rwlock_reader_unlock(&system_state_lock);
-            }
+            //Send data
             send_data(&system_state);
+            // get data from openchirp
+            // double set_point;
+            // if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
+            //     rwlock_reader_lock(&system_state_lock);
+            //     get_system_state(&system_state);
+            //     system_state.set_point = set_point;
+            //     set_system_state(&system_state);
+            //     printf("System set point is %i", system_state.set_point);
+            //     rwlock_reader_unlock(&system_state_lock);
+            // }
         }
 
         for (int countdown = 9; countdown >= 0; countdown--) {
@@ -601,3 +601,8 @@ void wifi_init_task( void ) {
 void wifi_enter_config_mode() {
     module_mode = MODULE_MODE_CONFIG;
 }
+
+void send_temp_set_wrapper( void ){
+    char data_buf[16];
+    send_transducer_value(TRANSDUCER_ID_SET_POINT, data_buf);
+};

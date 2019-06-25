@@ -24,6 +24,8 @@
 /** @brief name of the wifi task */
 extern const char * const wifi_task_name;
 
+void send_temp_set_wrapper( void );
+
 /**
  * @brief function that initializes that wifi task
  *
