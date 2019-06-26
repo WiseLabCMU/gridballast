@@ -84,7 +84,7 @@ static void lcd_change_reception_mode(system_state_t *mystate, u8g2_t *u8g2) {
 	sprintf(str, "0 - Manual");	
     u8g2_DrawStr(u8g2, 5, 25, str);
 
-	sprintf(str, "1 - OpenChirp");	
+	sprintf(str, "1 - Auto");	
     u8g2_DrawStr(u8g2, 5, 40, str);
 
 	sprintf(str, "Current Mode:%d", mystate->input_mode);
