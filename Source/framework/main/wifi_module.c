@@ -601,8 +601,9 @@ void wifi_init_task( void ) {
 void wifi_enter_config_mode() {
     module_mode = MODULE_MODE_CONFIG;
 }
-
+//Public wrapper which calls the send_transducer function for set_temp
 void send_temp_set_wrapper( void ){
     char data_buf[16];
+    sprintf(data_buf, "%d", system_state.set_point);
     send_transducer_value(TRANSDUCER_ID_SET_POINT, data_buf);
 };
