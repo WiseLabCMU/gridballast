@@ -202,14 +202,14 @@ uint8_t digitalRead(uint8_t pin) {
 void setupInterrupts(uint8_t mirroring, uint8_t openDrain, uint8_t polarity){
     // configure the port A
     uint8_t ioconfValue=readRegister(MCP23017_IOCONA);
-    ioconfValue = bitWrite(ioconfValue,6,mirroring);
+    ioconfValue = bitWrite(ioconfValue,6, mirroring);
     ioconfValue = bitWrite(ioconfValue,2,openDrain);
     ioconfValue = bitWrite(ioconfValue,1,polarity);
     writeRegister(MCP23017_IOCONA,ioconfValue);
 
     // Configure the port B
     ioconfValue=readRegister(MCP23017_IOCONB);
-    ioconfValue = bitWrite(ioconfValue,6,mirroring);
+    ioconfValue = bitWrite(ioconfValue,6, mirroring);
     ioconfValue = bitWrite(ioconfValue,2,openDrain);
     ioconfValue = bitWrite(ioconfValue,1,polarity);
     writeRegister(MCP23017_IOCONB,ioconfValue);

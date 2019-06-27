@@ -88,4 +88,10 @@
 
 #define MCP23017_INT_ERR 255
 
+// Gridballast Mapping
+#define GPIO5 4
+#define GPIO6 5
+#define GPIO7 6
+#define GPIO8 7
+
 #endif

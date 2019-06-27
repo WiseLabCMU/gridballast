@@ -49,7 +49,7 @@ static void controller_task_fn( void *pv_parameters )
     //if ( strcmp(mystate.mode,"E")== 0)
 
     //printf("bye...\n");
-     if ( mystate.mode == 1)
+     if ( mystate.input_mode == 1)
       {
 
         if (mystate.grid_freq > mystate.threshold_overfrq)
