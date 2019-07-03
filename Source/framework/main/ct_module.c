@@ -17,9 +17,10 @@
 #include "esp_adc_cal.h"
 #include "ct_module.h"
 #include "esp_wifi.h"
+#include "soc/sens_reg.h"
 
 
-/*work under progress*/
+
 #define ESP_INTR_FLAG_DEFAULT 0
 
 #define TAG "gridballast"
@@ -47,30 +48,35 @@ extern TaskHandle_t wifi_task_handler;
 // bool ledState = true;
 
 
-int timr_group = TIMER_GROUP_1;
-int timr_idx = TIMER_1;
+//int timr_group = TIMER_GROUP_1;
+//int timr_idx = TIMER_1;
 int i=0;
 float adc_val[10];
 int ct_flag = 1;
 
-void IRAM_ATTR timer_group1_isr(void *param) {
+extern uint64_t reg_a;
+extern uint64_t reg_b;
+extern uint64_t reg_c;
+
+/* void IRAM_ATTR timer_group1_isr(void *param) {
 	TIMERG1.int_clr_timers.t1 = 1;
 	TIMERG1.hw_timer[timr_idx].config.alarm_en = 1;
 	ct_flag=1;
-}
+}*/
   
 int sum = 0;
 float curr = 0.0;
 
-static void adc_task(void* arg) {
+/*static void adc_task(void* arg) {
     esp_err_t ret;
 	int read_adc2_raw;
      while(1) {
-	 	 //ESP_ERROR_CHECK(esp_wifi_deinit());
+        esp_wifi_stop();
+        esp_wifi_deinit();
 		 //vTaskSuspend(wifi_task_handler);
          if (ct_flag == 1) {
     	     adc_val[i] = adc1_get_raw(ADC1_CHANNEL_0);
-			 /*ret = adc2_get_raw(ADC2_CHANNEL_7, ADC_WIDTH_9Bit, &read_adc2_raw);
+			 ret = adc2_get_raw(ADC2_CHANNEL_7, ADC_WIDTH_9Bit, &read_adc2_raw);
 			 if ( ret == ESP_OK ) {
 				 printf("ADC2 %d\n",  read_adc2_raw );
 			 } else if ( ret == ESP_ERR_INVALID_STATE ) {
@@ -78,7 +84,7 @@ static void adc_task(void* arg) {
 			 } else if ( ret == ESP_ERR_TIMEOUT ) {
 				 //This can not happen in this example. But if WiFi is in use, such error code could be returned.
 				 printf("ADC2 is in use by Wi-Fi.\n");
-			 }*/
+			 }
 		     printf("******* ADC Task current s %f*********\n",	mystate.power);
              //Convert adc_reading to voltage in mV
              uint32_t voltage = esp_adc_cal_raw_to_voltage(adc1_get_raw(ADC1_CHANNEL_0), adc_chars);
@@ -104,8 +110,8 @@ static void adc_task(void* arg) {
     	}
       vTaskDelay(500/portTICK_PERIOD_MS);
   }
-}
-
+}*/
+/*
 static void relay_task(void* arg)
 {
   while(1)
@@ -123,7 +129,7 @@ static void relay_task(void* arg)
       rwlock_writer_unlock(&i2c_lock);  
     }
   }
-}
+}*/
 
 static void check_efuse()
 {
@@ -153,11 +159,11 @@ static void print_char_val_type(esp_adc_cal_value_t val_type)
     }
 }
 
-/*
- Use this function to setup the ADC.
+
+ /* Use this function to setup the ADC.
  Input - Channel to be configured
  */
-static void adc1_config() {
+void adc1_config() {
     //Check if Two Point or Vref are burned into eFuse
     check_efuse();
 
@@ -171,15 +177,15 @@ static void adc1_config() {
 
 }
 
-static void adc2_config() {
+void adc2_config() {
     adc2_config_channel_atten( ADC2_CHANNEL_7, ADC_ATTEN_11db );
 }
 
-void ct_init_task( void ) {
+/*void ct_init_task( void ) {
   //adc1_config_width(ADC_WIDTH_9Bit);
   //adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_11db);
   adc1_config();
-  //adc2_config();
+  adc2_config();
   timer_config_t config;
   config.alarm_en = 1;
   config.auto_reload = 1;
@@ -197,4 +203,4 @@ void ct_init_task( void ) {
   //xTaskCreate(relay_task, "adc_task", 1024, NULL, 10, NULL);
 
 
-}
+}*/
