@@ -54,7 +54,6 @@ static void controller_task_fn( void *pv_parameters )
         if ( mystate.input_mode == 1){
             if (mystate.grid_freq > mystate.threshold_overfrq){
                 printf("FREQ TOO HIGH\n");
-                ESP_LOGI(TAG, "FREQUENCY TOO HIGH");
                 rwlock_writer_lock(&system_state_lock);
                 get_system_state(&gb_system_state);
                 gb_system_state.set_point = 140 ;
@@ -64,7 +63,6 @@ static void controller_task_fn( void *pv_parameters )
 
             if (mystate.grid_freq < mystate.threshold_underfrq){
                 printf("FREQ TOO LOW\n");
-                ESP_LOGI(TAG, "FREQUENCY TOO LOW");
                 rwlock_writer_lock(&system_state_lock);
                 get_system_state(&gb_system_state);
                 gb_system_state.set_point = 110 ;
