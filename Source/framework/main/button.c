@@ -20,6 +20,7 @@
 #include "rwlock.h"
 #include "util.h"
 #include "button.h"
+#include "wifi_module.h"
 
 #define ESP_INTR_FLAG_DEFAULT 0
 
@@ -92,7 +93,7 @@ void mcp_task(void* arg)
 		//than LCD. Therefore all button interrupts are disabled whilst we are trying to process one so that the
 		//line stays high. This seems to work well.
 		disable_mcp_intr();
-		begin(0);
+		// begin(0);
         //Make sure the button is released
         if ( pin == S1 && val == 0) {
             button = 0;
@@ -105,6 +106,9 @@ void mcp_task(void* arg)
                 get_system_state(&mystate);
                 mystate.set_point++;
                 set_system_state(&mystate);
+                //Send Data to openchirp, so now openchirp reads from buttons pressed
+                printf("SENDING NEW TEMP SET!!!!!!!!!!!!!!!!\n"); 
+                send_temp_set_wrapper();
                 rwlock_writer_unlock(&system_state_lock);
             }
     		else if (mystate.lcd_display_mode == CHANGE_RECEPTION_MODE) {
@@ -113,6 +117,8 @@ void mcp_task(void* arg)
     		    mystate.input_mode += 1;
     			mystate.input_mode %= BUTTON_NO_OF_MODES;
     		    set_system_state(&mystate);
+                // printf("my display mode is %d", mystate.lcd_display_mode);
+                // printf("input mode is %i", mystate.input_mode);
     			rwlock_writer_unlock(&system_state_lock);
     	    }
         }
@@ -146,6 +152,9 @@ void mcp_task(void* arg)
         		get_system_state(&mystate);
         		mystate.set_point-- ;
         		set_system_state(&mystate);
+                //Send Data to openchirp, so now openchirp reads from buttons pressed 
+                printf("SENDING NEW TEMP SET!!!!!!!!!!!!!!!!\n");
+                send_temp_set_wrapper();
         		rwlock_writer_unlock(&system_state_lock);
             }
             else if (mystate.lcd_display_mode == CHANGE_RECEPTION_MODE) {
@@ -155,6 +164,8 @@ void mcp_task(void* arg)
         		mystate.input_mode += BUTTON_NO_OF_MODES;
     			mystate.input_mode %= BUTTON_NO_OF_MODES;
         		set_system_state(&mystate);
+                // printf("my display mode is %d", mystate.lcd_display_mode);
+                // printf("input mode is %i", mystate.input_mode);
         		rwlock_writer_unlock(&system_state_lock);
         	}
         }
@@ -169,7 +180,7 @@ void mcp_task(void* arg)
 		}
 		enable_mcp_intr();
    } 
-   vTaskDelay(500/portTICK_PERIOD_MS);
+   vTaskDelay(900/portTICK_PERIOD_MS);
  }   
 }
 
