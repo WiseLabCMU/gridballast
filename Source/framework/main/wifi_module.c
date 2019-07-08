@@ -377,6 +377,11 @@ static int send_data(system_state_t *system_state) {
 
     // only update grid frequency if it is nonzero so we don't push bogus value when
     // the zero crossing circuit is not connected
+    if (err == 0) {
+        sprintf(data_buf, "%d", system_state->set_point);
+        err = send_transducer_value(TRANSDUCER_ID_SET_POINT, data_buf);
+    }
+    
     if (err == 0) { //system_state->grid_freq > 5.0) {
         sprintf(data_buf, "%.4f", system_state->grid_freq);
         err = send_transducer_value(TRANSDUCER_ID_GRID_FREQ, data_buf);
@@ -390,11 +395,6 @@ static int send_data(system_state_t *system_state) {
     if (err == 0) {
         sprintf(data_buf, "%d", system_state->temp_top);
         err = send_transducer_value(TRANSDUCER_ID_TEMP_TOP, data_buf);
-    }
-
-    if (err == 0) {
-        sprintf(data_buf, "%d", system_state->set_point);
-        err = send_transducer_value(TRANSDUCER_ID_SET_POINT, data_buf);
     }
 
     return err;
@@ -494,7 +494,8 @@ static void run_mode_normal() {
                 get_system_state(&system_state);
                 system_state.set_point = set_point;
                 set_system_state(&system_state);
-                printf("System set point is %i", system_state.set_point);
+                printf("System set point is %i\n", system_state.set_point);
+                printf("System State is %i\n", system_state.input_mode);
                 rwlock_reader_unlock(&system_state_lock);
             }
             send_data(&system_state);
@@ -506,7 +507,7 @@ static void run_mode_normal() {
             get_system_state(&system_state);
             system_state.relay_1 = relay_1;
             set_system_state(&system_state);
-            printf("Relay 1 status %f", relay_1);
+            printf("Relay 1 status %f\n", relay_1);
             pinMode(6,GPIO_MODE_OUTPUT); 
             digitalWrite(6,relay_1);
             rwlock_reader_unlock(&system_state_lock);     
@@ -518,7 +519,7 @@ static void run_mode_normal() {
             get_system_state(&system_state);
             system_state.relay_2 = relay_2;
             set_system_state(&system_state);
-            printf("Relay 2 status %f", system_state.relay_2);
+            printf("Relay 2 status %f\n", system_state.relay_2);
             pinMode(7,GPIO_MODE_OUTPUT); 
             digitalWrite(7,relay_2);
             rwlock_reader_unlock(&system_state_lock);
@@ -528,6 +529,8 @@ static void run_mode_normal() {
         if (system_state.input_mode == 1){
             //Send data
             send_data(&system_state);
+            printf("System state is %i\n", system_state.input_mode);
+
             // get data from openchirp
             // double set_point;
             // if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
