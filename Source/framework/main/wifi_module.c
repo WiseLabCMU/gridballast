@@ -529,18 +529,6 @@ static void run_mode_normal() {
         if (system_state.input_mode == 1){
             //Send data
             send_data(&system_state);
-            printf("System state is %i\n", system_state.input_mode);
-
-            // get data from openchirp
-            // double set_point;
-            // if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
-            //     rwlock_reader_lock(&system_state_lock);
-            //     get_system_state(&system_state);
-            //     system_state.set_point = set_point;
-            //     set_system_state(&system_state);
-            //     printf("System set point is %i", system_state.set_point);
-            //     rwlock_reader_unlock(&system_state_lock);
-            // }
         }
 
         for (int countdown = 9; countdown >= 0; countdown--) {

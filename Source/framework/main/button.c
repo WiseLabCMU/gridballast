@@ -107,7 +107,6 @@ void mcp_task(void* arg)
                 mystate.set_point++;
                 set_system_state(&mystate);
                 //Send Data to openchirp, so now openchirp reads from buttons pressed
-                printf("SENDING NEW TEMP SET!!!!!!!!!!!!!!!!\n"); 
                 send_temp_set_wrapper();
                 rwlock_writer_unlock(&system_state_lock);
             }
@@ -117,8 +116,6 @@ void mcp_task(void* arg)
     		    mystate.input_mode += 1;
     			mystate.input_mode %= BUTTON_NO_OF_MODES;
     		    set_system_state(&mystate);
-                // printf("my display mode is %d", mystate.lcd_display_mode);
-                // printf("input mode is %i", mystate.input_mode);
     			rwlock_writer_unlock(&system_state_lock);
     	    }
         }
@@ -153,7 +150,6 @@ void mcp_task(void* arg)
         		mystate.set_point-- ;
         		set_system_state(&mystate);
                 //Send Data to openchirp, so now openchirp reads from buttons pressed 
-                printf("SENDING NEW TEMP SET!!!!!!!!!!!!!!!!\n");
                 send_temp_set_wrapper();
         		rwlock_writer_unlock(&system_state_lock);
             }

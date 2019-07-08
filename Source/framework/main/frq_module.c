@@ -53,7 +53,6 @@ void frq_task(void* arg) {
 
   for(;;) {
     // wait for the notification from the ISR
-		
 		xQueueReceive(frq_queue, &timer_val, portMAX_DELAY);
 
     duration = timer_val - last_val;
@@ -100,6 +99,7 @@ void frq_init_task(void *arg) {
     gpio_set_direction(CONFIG_FRQ_PIN, GPIO_MODE_INPUT);
     gpio_set_direction(12, GPIO_MODE_OUTPUT);
 
+    //Creates frequency task in freq que
     frq_queue = xQueueCreate(1, sizeof(timer_val));
 
 
