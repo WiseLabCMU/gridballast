@@ -28,7 +28,7 @@
 
 #define TIMER_DIVIDER   80
 
-#define DEFAULT_VREF 1100
+#define DEFAULT_VREF 3300
 
 system_state_t mystate;
 
@@ -159,7 +159,10 @@ static void print_char_val_type(esp_adc_cal_value_t val_type)
     }
 }
 
-
+uint32_t get_voltage (int current) {
+    uint32_t voltage = esp_adc_cal_raw_to_voltage(current, adc_chars);
+    return voltage;
+}
  /* Use this function to setup the ADC.
  Input - Channel to be configured
  */
@@ -170,9 +173,9 @@ void adc1_config() {
 	adc1_config_width(ADC_WIDTH_9Bit);
 	adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_11db);
 	
-	adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
-	esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_11db, ADC_WIDTH_BIT_9, DEFAULT_VREF, adc_chars);
-	print_char_val_type(val_type);
+	//adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
+	//esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_0db, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars);
+	//print_char_val_type(val_type);
 	//free(adc_chars);
 
 }

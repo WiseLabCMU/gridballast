@@ -34,6 +34,7 @@
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 #include "wifi_adc.h"
+#include "lora_module.h"
 
 bool State = true;
 
@@ -90,7 +91,8 @@ void init_task( void *pv_parameters ) {
     
     printf("Initializing lcd\n");
     lcd_init_task();
-    wifi_adc_init();       
+    //wifi_adc_init();  
+    lora_init();     
     //rs485_init_task();
     //ct_init_task();
     printf("Initialization done\n");    

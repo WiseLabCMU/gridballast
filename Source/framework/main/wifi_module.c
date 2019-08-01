@@ -83,8 +83,8 @@ static intr_handle_t s_timer_handle;
 int timr_group = TIMER_GROUP_1;
 int timr_idx = TIMER_0;
 
-int voltage_val[100];
-int current_val[100];
+int voltage_val[NO_OF_ADC_SAMPLES];
+int current_val[NO_OF_ADC_SAMPLES];
 
 static volatile wifi_module_mode_t wifi_module_mode;
 //uint8_t wifi_counter = 0;
@@ -633,10 +633,10 @@ static void run_adc() {
     /*
     TODO - replace this with a proper power measurement logic
     */
-    for (i=0; i < 100; i++) {
+    for (i=0; i < NO_OF_ADC_SAMPLES; i++) {
         ret = adc2_get_raw(ADC2_CHANNEL_7, ADC_WIDTH_9Bit, &voltage_val[i]);
         if ( ret == ESP_OK ) {
-            printf("ADC2 %d\n",  voltage_val[i]);
+            //printf("ADC2 %d\n",  voltage_val[i]);
         } else if ( ret == ESP_ERR_INVALID_STATE ) {
             //printf("ADC2 not initialized yet.\n");
         } else if ( ret == ESP_ERR_TIMEOUT ) {
@@ -647,8 +647,13 @@ static void run_adc() {
         sum_v += voltage_val[i];
         sum_i += current_val[i];
     }
-    avg_v = sum_v/100;
-    avg_i = sum_i/100;
+    avg_v = sum_v/NO_OF_ADC_SAMPLES;
+    avg_i = sum_i/NO_OF_ADC_SAMPLES;
+    printf("************************\n");
+    for (i=0; i< NO_OF_ADC_SAMPLES; i++) {
+      printf("current %d\n", current_val[i]);
+    }
+    printf("************************\n");
     printf("voltage %lf current %lf\n", avg_v, avg_i);
     
 }

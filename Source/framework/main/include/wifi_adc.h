@@ -6,6 +6,7 @@ Header file for wifi_adc2.c
 #define wifi_adc_task_priority 8
 #define WIFI_TIMER 20
 #define TIMER_DIVIDER 80
+#define NO_OF_ADC_SAMPLES 6000
 
 typedef enum {
     WIFI_MODULE_MODE_NORMAL,
