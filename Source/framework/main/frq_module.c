@@ -69,7 +69,7 @@ void frq_task(void* arg) {
 
     //freq_array_ptr[freq_idx] = frequency;
     //freq_idx ++;
-
+    //TO BE CONTINUED
     duration = timer_val - last_val;
 
 		last_val = timer_val;
