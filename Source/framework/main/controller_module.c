@@ -21,6 +21,7 @@
 #include "rwlock.h"
 
 
+
 const char * const controller_task_name = "controller_module_task";
 static const char *TAG = "CONTROLLER_MAIN";
 
@@ -30,6 +31,7 @@ static system_state_t mystate;
 /*****************************************
  ************ MODULE FUNCTIONS ***********
  *****************************************/
+
 
 /**
  * @brief controller task logic
@@ -54,6 +56,15 @@ static void controller_task_fn( void *pv_parameters )
         if ( mystate.input_mode == 1){
             if (mystate.grid_freq > mystate.threshold_overfrq){
                 printf("FREQ TOO HIGH\n");
+<<<<<<< HEAD
+=======
+                ESP_LOGI(TAG, "FREQUENCY TOO HIGH");
+
+                //Delay Task from 0 to 5 minutes
+                printf("DELAY STARTING NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+                vTaskDelay((rand() % 300000) / portTICK_PERIOD_MS);
+                printf("DELAY ENDED NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+>>>>>>> feature/stochastic_delay
                 rwlock_writer_lock(&system_state_lock);
                 get_system_state(&gb_system_state);
                 gb_system_state.set_point = 140 ;
@@ -63,6 +74,17 @@ static void controller_task_fn( void *pv_parameters )
 
             if (mystate.grid_freq < mystate.threshold_underfrq){
                 printf("FREQ TOO LOW\n");
+<<<<<<< HEAD
+=======
+                ESP_LOGI(TAG, "FREQUENCY TOO LOW");
+
+                printf("DELAY STARTING NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+                //Delay Task from 0 to 5 minutes
+                vTaskDelay((rand() % 300000) / portTICK_PERIOD_MS);
+                printf("DELAY ENDED NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+
+>>>>>>> feature/stochastic_delay
                 rwlock_writer_lock(&system_state_lock);
                 get_system_state(&gb_system_state);
                 gb_system_state.set_point = 110 ;

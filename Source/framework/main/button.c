@@ -176,7 +176,7 @@ void mcp_task(void* arg)
 		}
 		enable_mcp_intr();
    } 
-   vTaskDelay(900/portTICK_PERIOD_MS);
+   vTaskDelay(600/portTICK_PERIOD_MS);
  }   
 }
 

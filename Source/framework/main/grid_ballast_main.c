@@ -77,7 +77,7 @@ void init_task( void *pv_parameters ) {
     rwlock_writer_unlock(&system_state_lock);
         
     wifi_init_task();
-    //sensing_init_task();
+    //sensing_init_taskx();
     controller_init_task();
 
     printf("Initializing frq\n");
