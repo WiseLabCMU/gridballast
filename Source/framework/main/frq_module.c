@@ -6,6 +6,7 @@
 //#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "util.h"
+#include "frq_module.h"
 
 
 
@@ -20,6 +21,11 @@ xQueueHandle frq_queue;
 system_state_t mystate;
 
 static intr_handle_t s_timer_handle;
+
+//Pointer to frequency array
+double * freq_array_ptr;
+//Frequency index counter
+int freq_idx = 0;
 
 int timer_group = TIMER_GROUP_0;
 int timer_idx = TIMER_0;
@@ -45,6 +51,11 @@ void IRAM_ATTR frq_isr_handler(void* arg)
 }
 
 void frq_task(void* arg) {
+
+  //Initialize Frequency array 
+  freq_array_ptr = malloc(numberFrequencyEntries)
+
+  
 	// infinite loop
 	uint64_t duration = 0;
 	uint64_t last_val = 0;
@@ -56,6 +67,9 @@ void frq_task(void* arg) {
 		
 		xQueueReceive(frq_queue, &timer_val, portMAX_DELAY);
 
+    //freq_array_ptr[freq_idx] = frequency;
+    //freq_idx ++;
+
     duration = timer_val - last_val;
 
 		last_val = timer_val;
@@ -63,18 +77,12 @@ void frq_task(void* arg) {
 		if(duration > 15000) {
       frq = 1.0/duration*1000000*1.0;
       
-
-
       if (frq > 50)
       {
-        avg_frq = (avg_frq*l + frq)/(l+1);
-
-
-  
+        avg_frq = (avg_frq*l + frq)/(l+1);  
         l++;
       }
       if(l >= 200) {
-
         rwlock_writer_lock(&system_state_lock);
         get_system_state(&mystate);
         mystate.grid_freq = avg_frq;

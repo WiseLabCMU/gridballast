@@ -14,6 +14,8 @@
 #define frqUSStackDepth ((unsigned short) 2048) /* bytes */
 /** @brief priority of the controller stack */
 #define frqUXPriority (2)
+/**Number of entries in Frequency array */
+#define numberFrequencyEntries 1024 /*doubles */
 
 /** @brief name of the controller task */
 extern const char * const frq_task_name;
