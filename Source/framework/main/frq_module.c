@@ -64,7 +64,6 @@ void frq_task(void* arg) {
 
   for(;;) {
     // wait for the notification from the ISR
-		
 		xQueueReceive(frq_queue, &timer_val, portMAX_DELAY);
 
    
@@ -73,17 +72,19 @@ void frq_task(void* arg) {
 		last_val = timer_val;
 
 		if(duration > 15000) {
+      //Calculate frq based on time val from queue
       frq = 1.0/duration*1000000*1.0;
-      //append frequency in moment to freq_array, increase freq_array counter
-      freq_array_ptr[freq_idx] = frq;
-      freq_idx ++;
 
-
+      //Only care about relavant frequencies
       if (frq > 50)
       {
         avg_frq = (avg_frq*l + frq)/(l+1);  
         l++;
+        //append frequency in moment to freq_array, increase freq_array counter
+        freq_array_ptr[freq_idx] = frq;
+        freq_idx ++;
       }
+      //If time period has elapsed, find average frequency, change system state, restart time period
       if(l >= 200) {
         rwlock_writer_lock(&system_state_lock);
         get_system_state(&mystate);
