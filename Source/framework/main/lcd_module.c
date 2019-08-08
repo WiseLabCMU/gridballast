@@ -51,7 +51,7 @@ static void lcd_display_info (system_state_t *mystate, u8g2_t *u8g2) {
 	u8g2_DrawStr(u8g2, 10, 25, str);
 	
 	sprintf(str, "H:%d", heating_status);
-	u8g2_DrawStr(u8g2, 80, 25, str);
+	u8g2_DrawStr(u8g2, 95, 25, str);
 
 	sprintf(str,"Ts:%dF",temp_set_point);
 	u8g2_DrawStr(u8g2, 10, 40, str);
@@ -157,7 +157,7 @@ static void task_lcd(void *arg)
     u8g2_SetContrast(&u8g2, 100);
     u8g2_SetFlipMode(&u8g2, 1);
 	
-	u8g2_SetFont(&u8g2,u8g2_font_t0_13_te);
+	u8g2_SetFont(&u8g2,u8g2_font_t0_13_mf);
 
 	u8g2_ClearDisplay(&u8g2);
 	u8g2_SendBuffer(&u8g2);
@@ -171,13 +171,14 @@ static void task_lcd(void *arg)
         get_system_state(&mystate);
         rwlock_reader_unlock(&system_state_lock);
         
-		//determine the lcd display_mode
+		//determie the lcd display_mode
+
 		switch (mystate.lcd_display_mode) {
             case DISPLAY_INFO:
 				if (current_display_state != DISPLAY_INFO) {
 					current_display_state = DISPLAY_INFO;
-				    u8g2_ClearDisplay(&u8g2);
-				    u8g2_SendBuffer(&u8g2);
+					u8g2_ClearDisplay(&u8g2);
+		            u8g2_SendBuffer(&u8g2);
 				}
 				lcd_display_info(&mystate, &u8g2);
 		        break;

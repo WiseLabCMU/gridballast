@@ -24,5 +24,8 @@ extern const char * const ct_task_name;
  * @return void
  */
 void ct_init_task( void );
+void adc1_config();
+void adc2_config();
+uint32_t get_voltage(int);
 
 #endif /* __ct_module_h_ */
