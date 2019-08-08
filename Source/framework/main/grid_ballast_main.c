@@ -33,6 +33,8 @@
 #include "util.h"
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
+#include "wifi_adc.h"
+#include "lora_module.h"
 
 bool State = true;
 
@@ -76,8 +78,9 @@ void init_task( void *pv_parameters ) {
     set_system_state(&gb_system_state);
     rwlock_writer_unlock(&system_state_lock);
         
-    wifi_init_task();
+    //wifi_init_task();
     //sensing_init_task();
+
     controller_init_task();
 
     printf("Initializing frq\n");
@@ -88,15 +91,14 @@ void init_task( void *pv_parameters ) {
     
     printf("Initializing lcd\n");
     lcd_init_task();
-     
-    printf("Initialization done\n");
-    
+    //wifi_adc_init();  
+    lora_init();     
     //rs485_init_task();
     //ct_init_task();
-    
+    printf("Initialization done\n");    
     //vTaskDelay(500/portTICK_PERIOD_MS);
+    while(1);
 
-    while(1);   
 }
     
 
