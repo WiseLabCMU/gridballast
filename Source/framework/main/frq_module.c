@@ -67,16 +67,18 @@ void frq_task(void* arg) {
 		
 		xQueueReceive(frq_queue, &timer_val, portMAX_DELAY);
 
-    //freq_array_ptr[freq_idx] = frequency;
-    //freq_idx ++;
-    //TO BE CONTINUED
+   
     duration = timer_val - last_val;
 
 		last_val = timer_val;
 
 		if(duration > 15000) {
       frq = 1.0/duration*1000000*1.0;
-      
+      //append frequency in moment to freq_array, increase freq_array counter
+      freq_array_ptr[freq_idx] = frq;
+      freq_idx ++;
+
+
       if (frq > 50)
       {
         avg_frq = (avg_frq*l + frq)/(l+1);  
