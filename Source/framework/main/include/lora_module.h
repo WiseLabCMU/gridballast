@@ -19,25 +19,31 @@
 #define REG_FIFO_TX_BASE_ADDR    0x0e
 #define REG_FIFO_RX_BASE_ADDR    0x0f
 #define REG_FIFO_RX_CURRENT_ADDR 0x10
+#define REG_IRQMASK              0x11
 #define REG_IRQ_FLAGS            0x12
 #define REG_RX_NB_BYTES          0x13
 #define REG_PKT_SNR_VALUE        0x19
 #define REG_PKT_RSSI_VALUE       0x1a
 #define REG_MODEM_CONFIG_1       0x1d
 #define REG_MODEM_CONFIG_2       0x1e
+#define REG_RX_TIMEOUT_LSB       0x1f
 #define REG_PREAMBLE_MSB         0x20
 #define REG_PREAMBLE_LSB         0x21
 #define REG_PAYLOAD_LENGTH       0x22
-#define REG_LR_HOP_PERIOD         0x24
+#define REG_LR_HOP_PERIOD        0x24
 #define REG_MODEM_CONFIG_3       0x26
 #define REG_FREQ_ERROR_MSB       0x28
 #define REG_FREQ_ERROR_MID       0x29
 #define REG_FREQ_ERROR_LSB       0x2a
 #define REG_RSSI_WIDEBAND        0x2c
+#define REG_2F                   0x2f
+#define REG_30                   0x30
 #define REG_DETECTION_OPTIMIZE   0x31
 #define REG_INVERTIQ             0x33
+#define REG_36                   0x36
 #define REG_DETECTION_THRESHOLD  0x37
 #define REG_SYNC_WORD            0x39
+#define REG_3A                   0x3a
 #define REG_INVERTIQ2            0x3b
 #define REG_DIO_MAPPING_1        0x40
 #define REG_DIO_MAPPING_2        0X41
@@ -47,6 +53,7 @@
 
 //REG_OP_MODE
 #define RF_OPMODE_SLEEP         0xF8
+#define RF_OPMODE_RANGE         0X7F
 
 // REG_PA_CONFIG
 #define RF_PACONFIG_PASELECT_MASK                   0x7F
@@ -187,6 +194,30 @@
 #define RFLR_INVERTIQ2_ON                           0x19
 #define RFLR_INVERTIQ2_OFF                          0x1D
 
+/*!
+ * RegIrqFlagsMask
+ */
+#define RFLR_IRQFLAGS_RXTIMEOUT_MASK                0x80 
+#define RFLR_IRQFLAGS_RXDONE_MASK                   0x40 
+#define RFLR_IRQFLAGS_PAYLOADCRCERROR_MASK          0x20 
+#define RFLR_IRQFLAGS_VALIDHEADER_MASK              0x10 
+#define RFLR_IRQFLAGS_TXDONE_MASK                   0x08 
+#define RFLR_IRQFLAGS_CADDONE_MASK                  0x04 
+#define RFLR_IRQFLAGS_FHSSCHANGEDCHANNEL_MASK       0x02 
+#define RFLR_IRQFLAGS_CADDETECTED_MASK              0x01 
+
+/*!
+ * RegIrqFlags
+ */
+#define RFLR_IRQFLAGS_RXTIMEOUT                     0x80 
+#define RFLR_IRQFLAGS_RXDONE                        0x40 
+#define RFLR_IRQFLAGS_PAYLOADCRCERROR               0x20 
+#define RFLR_IRQFLAGS_VALIDHEADER                   0x10 
+#define RFLR_IRQFLAGS_TXDONE                        0x08 
+#define RFLR_IRQFLAGS_CADDONE                       0x04 
+#define RFLR_IRQFLAGS_FHSSCHANGEDCHANNEL            0x02 
+#define RFLR_IRQFLAGS_CADDETECTED                   0x01 
+
 // Additional settings
 #define REG_LR_PLLHOP                               0x44
 #define REG_LR_TCXO                                 0x4B
@@ -199,7 +230,51 @@
 #define REG_LR_AGCTHRESH3                           0x64
 #define REG_LR_PLL                                  0x70
 
+/*!
+ * RegDioMapping1
+ */
+#define RFLR_DIOMAPPING1_DIO0_MASK                  0x3F
+#define RFLR_DIOMAPPING1_DIO0_00                    0x00  // Default
+#define RFLR_DIOMAPPING1_DIO0_01                    0x40
+#define RFLR_DIOMAPPING1_DIO0_10                    0x80
+#define RFLR_DIOMAPPING1_DIO0_11                    0xC0
 
+#define RFLR_DIOMAPPING1_DIO1_MASK                  0xCF
+#define RFLR_DIOMAPPING1_DIO1_00                    0x00  // Default
+#define RFLR_DIOMAPPING1_DIO1_01                    0x10
+#define RFLR_DIOMAPPING1_DIO1_10                    0x20
+#define RFLR_DIOMAPPING1_DIO1_11                    0x30
+
+#define RFLR_DIOMAPPING1_DIO2_MASK                  0xF3
+#define RFLR_DIOMAPPING1_DIO2_00                    0x00  // Default
+#define RFLR_DIOMAPPING1_DIO2_01                    0x04
+#define RFLR_DIOMAPPING1_DIO2_10                    0x08
+#define RFLR_DIOMAPPING1_DIO2_11                    0x0C
+
+#define RFLR_DIOMAPPING1_DIO3_MASK                  0xFC
+#define RFLR_DIOMAPPING1_DIO3_00                    0x00  // Default
+#define RFLR_DIOMAPPING1_DIO3_01                    0x01
+#define RFLR_DIOMAPPING1_DIO3_10                    0x02
+#define RFLR_DIOMAPPING1_DIO3_11                    0x03
+
+/*!
+ * RegDioMapping2
+ */
+#define RFLR_DIOMAPPING2_DIO4_MASK                  0x3F
+#define RFLR_DIOMAPPING2_DIO4_00                    0x00  // Default
+#define RFLR_DIOMAPPING2_DIO4_01                    0x40
+#define RFLR_DIOMAPPING2_DIO4_10                    0x80
+#define RFLR_DIOMAPPING2_DIO4_11                    0xC0
+
+#define RFLR_DIOMAPPING2_DIO5_MASK                  0xCF
+#define RFLR_DIOMAPPING2_DIO5_00                    0x00  // Default
+#define RFLR_DIOMAPPING2_DIO5_01                    0x10
+#define RFLR_DIOMAPPING2_DIO5_10                    0x20
+#define RFLR_DIOMAPPING2_DIO5_11                    0x30
+
+#define RFLR_DIOMAPPING2_MAP_MASK                   0xFE
+#define RFLR_DIOMAPPING2_MAP_PREAMBLEDETECT         0x01
+#define RFLR_DIOMAPPING2_MAP_RSSI                   0x00  // Default
 // modes
 #define MODE_LONG_RANGE_MODE     0x80
 #define MODE_SLEEP               0x00
@@ -228,6 +303,12 @@
 #define FREQ_STEP                        61.03515625
 #define TX_OUTPUT_POWER                  14
 
+/*!
+ * Constant values need to compute the RSSI value
+ */
+#define RSSI_OFFSET_LF                              -164.0
+#define RSSI_OFFSET_HF                              -157.0
+
 #define RF_MID_BAND_THRESH               525000000
 
 //LORA TX SETTINGS
@@ -248,6 +329,22 @@
 #define LORA_IQ_INVERSION_ON                        false
 #define LORA_CRC_ENABLED                            true
 
+#define LORA_RX_BUFFER_SIZE                         256
+
+#define MCP_DIO0_PIN_NUMBER                         0xA
+#define MCP_DIO1_PIN_NUMBER                         0xB
+                               
+/*
+ * Radio driver internal state machine states definition
+ */
+typedef enum
+{
+    RF_IDLE = 0,
+    RF_RX_RUNNING,
+    RF_TX_RUNNING,
+    RF_CAD,
+}radio_state_t;
+
 
 /** @brief depth of the lora stack */
 #define loraUSStackDepth ((unsigned short) 8192) /* bytes */
@@ -255,3 +352,4 @@
 #define loraUXPriority (1)
 
 void lora_init();
+void rfm95_isr_handler(uint8_t pin_button, uint8_t val);

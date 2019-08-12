@@ -11,6 +11,9 @@
 spi_bus_config_t spi_bus_config;
 spi_device_interface_config_t spi_device_config;
 static spi_device_handle_t handle_spi;      // SPI handle.
+uint8_t *rx_buffer;
+volatile radio_state_t rfm95_current_radio_state = RF_IDLE;
+volatile int lora = 0;
 
 void spi_bus_configure() {
     spi_bus_config.mosi_io_num = 23;
@@ -68,7 +71,7 @@ void rfm95_read_register(uint8_t reg, uint8_t *data) {
     rfm95_send_data(read_register);
     rfm95_receive_data(data);
     gpio_set_level(HOPE_RF_SLAVE_SELECT_PIN, 1);
-    printf("reg %x data %x\n", reg, *data);
+    //printf("reg %x data %x\n", reg, *data);
 }
 
 void rfm95_write_register(uint8_t reg, const uint8_t val) {
@@ -109,6 +112,14 @@ void rfm95_tx() {
     tx = (tx & RF_OPMODE_SLEEP) | MODE_TX;
     rfm95_write_register(REG_OP_MODE, tx);
 }
+
+void rfm95_rx() {
+    uint8_t rx;
+    rfm95_read_register(REG_OP_MODE, &rx);
+    rx = (rx & RF_OPMODE_SLEEP) | MODE_RX_CONTINUOUS;
+    rfm95_write_register(REG_OP_MODE, rx);
+}
+
 uint8_t get_pa_select(uint64_t channel) {
     //NOTE - this may have to be revisited in case things dont work
     if (channel > RF_MID_BAND_THRESH) {
@@ -117,6 +128,14 @@ uint8_t get_pa_select(uint64_t channel) {
     else {
         return RF_PACONFIG_PASELECT_RFO;
     }
+}
+
+void set_frequency(uint64_t frequency) {
+    uint64_t frf = ((double)frequency) / ((double)FREQ_STEP);
+    rfm95_write_register(REG_FRF_MSB, (uint8_t)((frf >> 16) & 0xff));
+    rfm95_write_register(REG_FRF_MID, (uint8_t)((frf >> 8) & 0xff));
+    rfm95_write_register(REG_FRF_LSB, (uint8_t)(frf & 0xff));
+
 }
 
 void rfm95_set_tx_power(int8_t power) {
@@ -221,6 +240,7 @@ void end_packet() {
 void rfm95_send(const uint8_t *buffer, size_t size) {
     uint8_t current_length;
     size_t i;
+    rfm95_sleep();
     if (LORA_IQ_INVERSION_ON) {
         uint8_t invert_iq;
         rfm95_read_register(REG_INVERTIQ, &invert_iq);
@@ -253,12 +273,196 @@ void rfm95_send(const uint8_t *buffer, size_t size) {
     rfm95_tx();
 }
 
+void rfm95_dio0_irq(uint8_t pin, uint8_t val) {
+    uint8_t snr_u = 0, rssi_u = 0, size_rx = 0, i = 0;
+    int8_t snr = 0, rssi = 0;
+    uint8_t irq_flags;
+
+    switch (rfm95_current_radio_state) {
+        case RF_RX_RUNNING:
+            //rx done
+            //clear signal on expander
+            if (val != 1) {
+                assert(0);
+            }
+            //clear irq on rfm chip
+            rfm95_write_register( REG_IRQ_FLAGS, RFLR_IRQFLAGS_RXDONE );
+            rfm95_read_register(REG_IRQ_FLAGS, &irq_flags);
+            if((irq_flags & RFLR_IRQFLAGS_PAYLOADCRCERROR_MASK ) == RFLR_IRQFLAGS_PAYLOADCRCERROR ) {
+                rfm95_write_register(REG_IRQ_FLAGS, RFLR_IRQFLAGS_PAYLOADCRCERROR);
+                rfm95_current_radio_state = RF_IDLE;
+                //TODO - detach the timer implemented
+                //other error handling to be done here
+            }
+            rfm95_read_register(REG_PKT_SNR_VALUE, &snr_u);
+            snr = (int8_t)snr_u;
+            if (snr & 0x80) {
+                // Invert and divide by 4
+                snr = ((~snr + 1) & 0xff) >> 2;
+                snr = -snr;
+            }
+            else {
+                snr = (snr & 0xff) >> 2;
+            }
+            rfm95_read_register(REG_PKT_RSSI_VALUE, &rssi_u);
+            rssi = (int8_t)rssi_u;
+            if (snr < 0) {
+                if (RF_FREQUENCY > RF_MID_BAND_THRESH) {
+                    rssi = RSSI_OFFSET_HF + rssi + (rssi >> 4) + snr;
+                }
+                else {
+                    rssi = RSSI_OFFSET_LF + rssi + (rssi >> 4) + snr;
+                }
+            }
+            else {
+                if (RF_FREQUENCY > RF_MID_BAND_THRESH) {
+                    rssi = RSSI_OFFSET_HF + rssi + (rssi >> 4);
+                }
+                else {
+                    rssi = RSSI_OFFSET_LF + rssi + (rssi >> 4);
+                }
+            }
+            rfm95_read_register(REG_RX_NB_BYTES, &size_rx);
+            printf("size %x\n", size_rx);
+            //read fifo
+            for (i = 0; i < size_rx; i++) {
+                rfm95_read_register(REG_FIFO, &rx_buffer[i]);
+                printf("%c\n", rx_buffer[i]);
+            }
+            //printf("\n");
+            memset(rx_buffer, 0 , LORA_RX_BUFFER_SIZE);
+            //TODO - more clean up???
+            rfm95_current_radio_state = RF_IDLE;
+            rfm95_idle();
+            break;
+        case RF_TX_RUNNING:
+
+            break;
+        default:
+            break;
+    }
+}
+
+void rfm95_receive() {
+    if (LORA_IQ_INVERSION_ON) {
+        uint8_t invert_iq;
+        rfm95_read_register(REG_INVERTIQ, &invert_iq);
+        invert_iq = (invert_iq & RFLR_INVERTIQ_TX_MASK & RFLR_INVERTIQ_RX_MASK) | RFLR_INVERTIQ_RX_ON | RFLR_INVERTIQ_TX_OFF;
+        rfm95_write_register(REG_INVERTIQ, invert_iq);
+        rfm95_write_register(REG_INVERTIQ2, RFLR_INVERTIQ2_ON);
+    }
+    else {
+        uint8_t invert_iq;
+        rfm95_read_register(REG_INVERTIQ, &invert_iq);
+        invert_iq = (invert_iq & RFLR_INVERTIQ_TX_MASK & RFLR_INVERTIQ_RX_MASK) | RFLR_INVERTIQ_RX_OFF | RFLR_INVERTIQ_TX_OFF;
+        rfm95_write_register(REG_INVERTIQ, invert_iq);
+        rfm95_write_register(REG_INVERTIQ2, RFLR_INVERTIQ2_OFF);
+    }
+    //printf("sha-1\n");
+    // ERRATA 2.3 - Receiver Spurious Reception of a LoRa Signal
+    if (LORA_BANDWIDTH < 9) {
+        uint8_t optimize_detect;
+        rfm95_read_register(REG_DETECTION_OPTIMIZE, &optimize_detect);
+        optimize_detect &= 0x7f;
+        rfm95_write_register(REG_DETECTION_OPTIMIZE, optimize_detect);
+        rfm95_write_register(REG_30, 0x00);
+        switch(LORA_BANDWIDTH) {
+            case 0: // 7.8 kHz
+                rfm95_write_register( REG_2F, 0x48 );
+                set_frequency(RF_FREQUENCY + 7.81e3 );
+                break;
+            case 1: // 10.4 kHz
+                rfm95_write_register( REG_2F, 0x44 );
+                set_frequency(RF_FREQUENCY + 10.42e3 );
+                break;
+            case 2: // 15.6 kHz
+                rfm95_write_register( REG_2F, 0x0 );
+                set_frequency(RF_FREQUENCY + 15.62e3 );
+                break;
+            case 3: // 20.8 kHz
+                rfm95_write_register( REG_2F, 0x44 );
+                set_frequency(RF_FREQUENCY + 20.83e3 );
+                break;
+            case 4: // 31.2 kHz
+                rfm95_write_register( REG_2F, 0x44 );
+                set_frequency(RF_FREQUENCY + 31.25e3 );
+                break;
+            case 5: // 41.4 kHz
+                rfm95_write_register( REG_2F, 0x44 );
+                set_frequency(RF_FREQUENCY + 41.67e3 );
+                break;
+            case 6: // 62.5 kHz
+                rfm95_write_register( REG_2F, 0x40 );
+                break;
+            case 7: // 125 kHz
+                rfm95_write_register( REG_2F, 0x40 );
+                break;
+            case 8: // 250 kHz
+                rfm95_write_register( REG_2F, 0x40 );
+                break;
+        }
+    }
+    else {
+        uint8_t optimize_detect;
+        rfm95_read_register(REG_DETECTION_OPTIMIZE, &optimize_detect);
+        optimize_detect |= 0x80;
+        rfm95_write_register(REG_DETECTION_OPTIMIZE, optimize_detect); 
+    }
+    //printf("sha-2\n");
+    if (LORA_FHSS_ENABLED) {
+        rfm95_write_register(REG_IRQMASK, RFLR_IRQFLAGS_VALIDHEADER |
+                                           RFLR_IRQFLAGS_TXDONE |
+                                           RFLR_IRQFLAGS_CADDONE |
+                                           RFLR_IRQFLAGS_CADDETECTED );
+        uint8_t dio_mapping1;
+        rfm95_read_register(REG_DIO_MAPPING_1, &dio_mapping1);
+        dio_mapping1 = (dio_mapping1 & RFLR_DIOMAPPING1_DIO0_MASK & RFLR_DIOMAPPING1_DIO2_MASK) | RFLR_DIOMAPPING1_DIO0_00 | RFLR_DIOMAPPING1_DIO2_00;
+        rfm95_write_register(REG_DIO_MAPPING_1, dio_mapping1);                                       
+    }
+    else {
+        rfm95_write_register(REG_IRQMASK, RFLR_IRQFLAGS_VALIDHEADER |
+                                          RFLR_IRQFLAGS_TXDONE |
+                                          RFLR_IRQFLAGS_CADDONE |
+                                          RFLR_IRQFLAGS_FHSSCHANGEDCHANNEL |
+                                          RFLR_IRQFLAGS_CADDETECTED );
+        uint8_t dio_mapping1;
+        rfm95_read_register(REG_DIO_MAPPING_1, &dio_mapping1);
+        dio_mapping1 = (dio_mapping1 & RFLR_DIOMAPPING1_DIO0_MASK) | RFLR_DIOMAPPING1_DIO0_00;
+        rfm95_write_register(REG_DIO_MAPPING_1, dio_mapping1); 
+
+    }
+    //printf("sha-3\n");
+    rfm95_write_register( REG_FIFO_RX_BASE_ADDR, 128);
+    rfm95_write_register( REG_FIFO_ADDR_PTR, 128 );
+    //change state to indicate we are receiving
+    rfm95_current_radio_state = RF_RX_RUNNING;
+    //printf("sha-4\n");
+    //TODO - placeholder for being able to receive continously
+    rfm95_rx();
+    //printf("sha-5\n");
+    //while(!lora);
+    //lora = 0;
+    /* uint8_t size_rx, i = 0;
+    rfm95_read_register(REG_RX_NB_BYTES, &size_rx);
+    printf("size %x\n", size_rx);
+    //read fifo
+    for (i = 0; i < 4; i++) {
+        rfm95_read_register(REG_FIFO, &rx_buffer[i]);
+        printf("%c\n", rx_buffer[i]);
+    }
+    memset(rx_buffer, 0 , LORA_RX_BUFFER_SIZE);
+    //TODO - more clean up???
+    rfm95_current_radio_state = RF_IDLE;
+    rfm95_idle();*/
+}
+
 void rfm95_set_tx_config(uint32_t f_dev, uint32_t band_width, uint32_t data_rate,
                          uint8_t code_rate, uint16_t preamble_length, bool fix_length, 
                          bool crc_on, bool freq_hop_on, uint8_t hop_period, 
                          bool iq_inverted, uint32_t timeout) {
     bool low_data_rate_optimize;
     uint8_t modem_config_1, modem_config_2, modem_config_3;
+    rfm95_sleep();
 
     if (band_width > 2) {
         assert(0);
@@ -285,7 +489,7 @@ void rfm95_set_tx_config(uint32_t f_dev, uint32_t band_width, uint32_t data_rate
         rfm95_write_register(REG_LR_HOP_PERIOD, hop_period);
     }
     rfm95_read_register(REG_MODEM_CONFIG_1, &modem_config_1);
-    modem_config_1 = (modem_config_1 & RFLR_MODEMCONFIG1_BW_MASK & RFLR_MODEMCONFIG1_CODINGRATE_MASK &RFLR_MODEMCONFIG1_CODINGRATE_MASK)
+    modem_config_1 = (modem_config_1 & RFLR_MODEMCONFIG1_BW_MASK & RFLR_MODEMCONFIG1_CODINGRATE_MASK & RFLR_MODEMCONFIG1_IMPLICITHEADER_MASK)
                      | (band_width << 4) | (code_rate << 1) | fix_length;
     rfm95_write_register(REG_MODEM_CONFIG_1, modem_config_1);
 
@@ -317,24 +521,128 @@ void rfm95_set_tx_config(uint32_t f_dev, uint32_t band_width, uint32_t data_rate
     }
 }
 
+void rfm95_set_lora_opmode() {
+    //set rfm95 to operate in Lora mode
+    uint8_t opmode;
+    rfm95_read_register(REG_OP_MODE, &opmode);
+    opmode = (opmode & RF_OPMODE_RANGE) | MODE_LONG_RANGE_MODE;
+    rfm95_write_register(REG_OP_MODE, opmode);
+    rfm95_write_register(REG_DIO_MAPPING_1, 0x00);
+    rfm95_write_register(REG_DIO_MAPPING_2, 0x00);
+}
+
+void rfm95_set_rx_config(uint32_t band_width, uint32_t data_rate, uint8_t code_rate,
+                          uint32_t bandwidth_afc, uint16_t preamble_length, uint16_t symb_timeout, bool fix_length,
+                          uint8_t payload_length, bool crc_on, bool freq_hop_on, uint8_t hop_period,
+                          bool iq_inverted, bool rx_continuous) {
+    rfm95_sleep();
+    bool low_data_rate_optimize;
+    uint8_t modem_config_1, modem_config_2, modem_config_3;
+
+    if (band_width > 2) {
+        assert(0);
+    }
+    band_width += 7;
+    if (data_rate > 12) {
+        data_rate = 12;
+    }
+    else if (data_rate < 6) {
+        data_rate = 6;
+    }
+    if( ( ( band_width == 7 ) && ( ( data_rate == 11 ) || ( data_rate == 12 ) ) ) ||
+        ( ( band_width == 8 ) && ( data_rate == 12 ) ) ) {
+        low_data_rate_optimize = true;
+    }
+    else {
+        low_data_rate_optimize = false;
+    }
+    rfm95_read_register(REG_MODEM_CONFIG_1, &modem_config_1);
+    modem_config_1 = (modem_config_1 & RFLR_MODEMCONFIG1_BW_MASK & RFLR_MODEMCONFIG1_CODINGRATE_MASK & RFLR_MODEMCONFIG1_IMPLICITHEADER_MASK)
+                     | (band_width << 4) | (code_rate << 1) | fix_length;
+    rfm95_write_register(REG_MODEM_CONFIG_1, modem_config_1);
+
+    rfm95_read_register(REG_MODEM_CONFIG_2, &modem_config_2);
+    modem_config_2 = (modem_config_2 & RFLR_MODEMCONFIG2_SF_MASK & RFLR_MODEMCONFIG2_RXPAYLOADCRC_MASK & RFLR_MODEMCONFIG2_SYMBTIMEOUTMSB_MASK)
+                     | (data_rate << 4) | (crc_on << 2) | ( ( symb_timeout >> 8 ) & ~RFLR_MODEMCONFIG2_SYMBTIMEOUTMSB_MASK );
+    rfm95_write_register(REG_MODEM_CONFIG_2, modem_config_2);
+
+    rfm95_read_register(REG_MODEM_CONFIG_3, &modem_config_3);
+    modem_config_3 = (modem_config_3 & RFLR_MODEMCONFIG3_LOWDATARATEOPTIMIZE_MASK) | (low_data_rate_optimize << 3);
+    rfm95_write_register(REG_MODEM_CONFIG_3, modem_config_3);  
+
+    rfm95_write_register( REG_RX_TIMEOUT_LSB, ( uint8_t )( symb_timeout & 0xFF ));
+    rfm95_write_register( REG_PREAMBLE_MSB, ( uint8_t )( ( preamble_length >> 8 ) & 0xFF ));
+    rfm95_write_register( REG_PREAMBLE_LSB, ( uint8_t )( preamble_length & 0xFF ));
+
+    if (fix_length) {
+        rfm95_write_register(REG_PAYLOAD_LENGTH, payload_length);
+    }
+    if (freq_hop_on) {
+        uint8_t freq_hop_reg;
+        rfm95_read_register(REG_LR_PLLHOP, &freq_hop_reg);
+        freq_hop_reg  = (freq_hop_reg & RFLR_PLLHOP_FASTHOP_MASK) | (RFLR_PLLHOP_FASTHOP_ON);
+        rfm95_write_register(REG_LR_PLLHOP, freq_hop_reg);
+        rfm95_write_register(REG_LR_HOP_PERIOD, hop_period);
+    }
+
+    if(( band_width == 9 ) && ( RF_FREQUENCY > RF_MID_BAND_THRESH ) ) {
+        // ERRATA 2.1 - Sensitivity Optimization with a 500 kHz Bandwidth
+        rfm95_write_register( REG_36, 0x02 );
+        rfm95_write_register( REG_3A, 0x64 );
+    }
+    else if( band_width == 9 ) {
+        // ERRATA 2.1 - Sensitivity Optimization with a 500 kHz Bandwidth
+        rfm95_write_register( REG_36, 0x02 );
+        rfm95_write_register( REG_3A, 0x7F );
+    }
+    else {
+        // ERRATA 2.1 - Sensitivity Optimization with a 500 kHz Bandwidth
+        rfm95_write_register( REG_36, 0x03 );
+    }
+    if (data_rate == 6) {
+        uint8_t optimize_detect;
+        rfm95_read_register(REG_DETECTION_OPTIMIZE, &optimize_detect);
+        optimize_detect = (optimize_detect & RFLR_DETECTIONOPTIMIZE_MASK) | RFLR_DETECTIONOPTIMIZE_SF6;
+        rfm95_write_register(REG_DETECTION_OPTIMIZE, optimize_detect);
+        rfm95_write_register(REG_DETECTION_THRESHOLD, RFLR_DETECTIONTHRESH_SF6);
+    }
+    else {
+        uint8_t optimize_detect;
+        rfm95_read_register(REG_DETECTION_OPTIMIZE, &optimize_detect);
+        optimize_detect = (optimize_detect & RFLR_DETECTIONOPTIMIZE_MASK) | RFLR_DETECTIONOPTIMIZE_SF7_TO_SF12;
+        rfm95_write_register(REG_DETECTION_OPTIMIZE, optimize_detect);
+        rfm95_write_register(REG_DETECTION_THRESHOLD, RFLR_DETECTIONTHRESH_SF7_TO_SF12);
+    }
+
+}
+
+void rfm95_isr_handler(uint8_t pin, uint8_t val) {
+    if (pin == MCP_DIO0_PIN_NUMBER) {
+        rfm95_dio0_irq(pin, val);
+    }
+    else if (pin == MCP_DIO1_PIN_NUMBER) {
+    }
+    else {
+        assert(0);
+    }
+}
+
 void lora_task() {
     while (1) {
         //uint8_t rx_data = 0;
         //lets try transmitting a PHY message for now
-        uint8_t data[4] = {'P', 'I', 'N', 'G'};
+        uint8_t data[4] = {'T', 'I', 'N', 'G'};
         //begin_packet();
         rfm95_send(data, 4);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+        rfm95_receive();
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        rfm95_dio0_irq(MCP_DIO0_PIN_NUMBER, 1);
+        //vTaskDelay(1000 / portTICK_PERIOD_MS);
+        //rfm95_send(data, 4);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
         //end_packet();
     }
-}
-
-void set_frequency(uint64_t frequency) {
-    uint64_t frf = ((double)frequency) / ((double)FREQ_STEP);
-    rfm95_write_register(REG_FRF_MSB, (uint8_t)((frf >> 16) & 0xff));
-    rfm95_write_register(REG_FRF_MID, (uint8_t)((frf >> 8) & 0xff));
-    rfm95_write_register(REG_FRF_LSB, (uint8_t)(frf & 0xff));
-
 }
 
 void lora_init() {
@@ -371,21 +679,22 @@ void lora_init() {
     //placeholder for changing tx frequency
     set_frequency(RF_FREQUENCY);
     
-    //set rfm95 to operate in Lora mode
-    rfm95_write_register(REG_OP_MODE, MODE_LONG_RANGE_MODE);
-    rfm95_write_register(REG_DIO_MAPPING_1, 0x00);
-    rfm95_write_register(REG_DIO_MAPPING_2, 0x00);
-
+    rfm95_set_lora_opmode();
     rfm95_set_tx_power(TX_OUTPUT_POWER);
 
     rfm95_set_tx_config(0, LORA_BANDWIDTH, LORA_SPREADING_FACTOR, LORA_CODINGRATE,
                         LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON, LORA_CRC_ENABLED, 
                         LORA_FHSS_ENABLED, LORA_NB_SYMB_HOP, LORA_IQ_INVERSION_ON, 2000 );
 
+    rfm95_set_rx_config(LORA_BANDWIDTH, LORA_SPREADING_FACTOR, LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
+                        LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON, 0, LORA_CRC_ENABLED, LORA_FHSS_ENABLED, 
+                        LORA_NB_SYMB_HOP, LORA_IQ_INVERSION_ON, true);
+
     //set the pointers of the FIFO buffer to 0, so that we use the full buffer
     rfm95_write_register(REG_FIFO_TX_BASE_ADDR, 0);
     rfm95_write_register(REG_FIFO_RX_BASE_ADDR, 0);
 
+    rx_buffer = malloc(LORA_RX_BUFFER_SIZE);
 /* 
     //set LF frequency boost
     rfm95_read_register(REG_LNA, &rx_data);
@@ -397,6 +706,15 @@ void lora_init() {
 */
     //placeholder for boosting transmission power
     rfm95_idle();
+    rfm95_current_radio_state = RF_IDLE;
+
+    //setup the interrupts in the IO expander
+    pinMode(0xA,GPIO_MODE_INPUT);
+    setupInterruptPin(0xA,GPIO_INTR_HIGH_LEVEL);
+
+    pinMode(0xB, GPIO_MODE_INPUT);
+    setupInterruptPin(0xB,GPIO_INTR_HIGH_LEVEL);
+
     xTaskCreate(lora_task, "lora_task", 8192, NULL, 9, NULL);
     
 }
