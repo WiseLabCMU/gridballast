@@ -14,7 +14,6 @@
 /** @brief priority of the wifi stack */
 #define wifiUXPriority (2)
 #define WIFI_TASK_DELAY 100
-#define TIMER_DIVIDER 80
 
 /*enum wifi_module_mode_type {
     MODULE_MODE_NORMAL,
@@ -42,9 +41,4 @@ void wifi_init_task( void );
  */
 void wifi_enter_config_mode();
 
-void init_mode_sta(const char *ssid, const char *password);
-void init_mode_ap();
-void run_mode_normal();
-void run_mode_config();
-void init_wifi();
 #endif /* __wifi_module_h_ */
