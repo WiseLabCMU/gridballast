@@ -624,14 +624,12 @@ void wifi_init_task( void ) {
 void wifi_enter_config_mode() {
     wifi_module_mode = WIFI_MODULE_MODE_CONFIG;
 }
-<<<<<<< HEAD
 //Public wrapper which calls the send_transducer function for set_temp
 void send_temp_set_wrapper( void ){
     char data_buf[16];
     sprintf(data_buf, "%d", system_state.set_point);
     send_transducer_value(TRANSDUCER_ID_SET_POINT, data_buf);
 };
-=======
 
 /*
 Function to run the wifi related functions
@@ -797,4 +795,3 @@ Output - None
     //instead we will initialize it everytime when the task runs
     xTaskCreatePinnedToCore(wifi_adc_task, "wifi_adc_task", wifi_adc_stack_depth, NULL, wifi_adc_task_priority, NULL, 0);
 }
->>>>>>> Sharan_development
