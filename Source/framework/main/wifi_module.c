@@ -34,6 +34,8 @@
 #include "ct_module.h"
 #include "driver/adc.h"
 #include "wifi_adc.h"
+#include "ct_module.h"
+#include "esp_adc_cal.h"
 
 
 /* typedef enum {
@@ -52,7 +54,7 @@
 
 const char * const wifi_task_name = "wifi_module_task";
 static const char *TAG = "wifi";
-
+extern esp_adc_cal_characteristics_t *adc_chars;
 
 /** @brief FreeRTOS event group to signal when softap is up */
 static EventGroupHandle_t wifi_event_group;
@@ -628,13 +630,14 @@ static void run_adc() {
     int i=0 , sum_i = 0, sum_v = 0;
     float avg_i, avg_v;
     esp_err_t ret;
+    //Check if Two Point or Vref are burned into eFuse
     adc1_config();
     adc2_config();
     /*
     TODO - replace this with a proper power measurement logic
     */
     for (i=0; i < NO_OF_ADC_SAMPLES; i++) {
-        ret = adc2_get_raw(ADC2_CHANNEL_7, ADC_WIDTH_9Bit, &voltage_val[i]);
+        ret = adc2_get_raw(ADC2_CHANNEL_7, ADC_WIDTH_12Bit, &voltage_val[i]);
         if ( ret == ESP_OK ) {
             //printf("ADC2 %d\n",  voltage_val[i]);
         } else if ( ret == ESP_ERR_INVALID_STATE ) {
@@ -650,9 +653,11 @@ static void run_adc() {
     avg_v = sum_v/NO_OF_ADC_SAMPLES;
     avg_i = sum_i/NO_OF_ADC_SAMPLES;
     printf("************************\n");
-    for (i=0; i< NO_OF_ADC_SAMPLES; i++) {
+    uint32_t voltage = esp_adc_cal_raw_to_voltage(avg_i, adc_chars);
+    printf("CT voltage %x\n", voltage);
+    /*for (i=0; i< NO_OF_ADC_SAMPLES; i++) {
       printf("current %d\n", current_val[i]);
-    }
+    }*/
     printf("************************\n");
     printf("voltage %lf current %lf\n", avg_v, avg_i);
     
@@ -690,7 +695,11 @@ static void wifi_adc_task () {
                 if (1) {
                     //adc2 and wifi cannot run together. Refer to the links at the header for more details
                     //save the register values for adc2 to be able to restore later
+                    
                     run_adc();
+                    //reg_a = READ_PERI_REG(SENS_SAR_START_FORCE_REG);
+                    //reg_b = READ_PERI_REG(SENS_SAR_READ_CTRL2_REG);
+                    //reg_c = READ_PERI_REG(SENS_SAR_MEAS_START2_REG);
                     //init_mode_sta(ssid, pass);
                     //run_wifi();
                     /* if (wifi_counter == WIFI_TIMER) {
@@ -703,9 +712,9 @@ static void wifi_adc_task () {
                         wifi_counter++;
                     }*/
                     //fix adc register settings for next time around
-                    WRITE_PERI_REG(SENS_SAR_START_FORCE_REG, reg_a);
-                    WRITE_PERI_REG(SENS_SAR_READ_CTRL2_REG, reg_b);
-                    WRITE_PERI_REG(SENS_SAR_MEAS_START2_REG, reg_c);
+                    //WRITE_PERI_REG(SENS_SAR_START_FORCE_REG, reg_a);
+                    //WRITE_PERI_REG(SENS_SAR_READ_CTRL2_REG, reg_b);
+                    //WRITE_PERI_REG(SENS_SAR_MEAS_START2_REG, reg_c);
                     //timer_flag = 0;
                     //TIMERG1.hw_timer[timr_idx].config.alarm_en = 1;
                     //timer_start(timr_group, timr_idx);

@@ -43,5 +43,6 @@ enum input_modes {
  * @return void
  */
 void button_init_task( void );
+void handle_button_interrupt(uint8_t pin, uint8_t val);
 
 #endif /* __ct_module_h_ */

@@ -1,11 +1,13 @@
 #include "driver/spi_common.h"
 #include "driver/spi_master.h"
-#include "lora_module.h"
+#include "Lora_mac/radio/rfm95/rfm95.h"
 #include <string.h>
 #include "esp_err.h"
 #include "freertos/task.h"
 #include "Ada_MCP.h" 
 #include "driver/gpio.h"
+#include "LoraMac_Class_A.h"
+
 
 
 spi_bus_config_t spi_bus_config;
@@ -14,6 +16,9 @@ static spi_device_handle_t handle_spi;      // SPI handle.
 uint8_t *rx_buffer;
 volatile radio_state_t rfm95_current_radio_state = RF_IDLE;
 volatile int lora = 0;
+uint8_t irq_flags;
+extern bool IrqFired;
+
 
 void spi_bus_configure() {
     spi_bus_config.mosi_io_num = 23;
@@ -80,10 +85,6 @@ void rfm95_write_register(uint8_t reg, const uint8_t val) {
     rfm95_send_data(write_register);
     rfm95_send_data(val);
     gpio_set_level(HOPE_RF_SLAVE_SELECT_PIN, 1);
-    /* uint8_t check;
-    rfm95_read_register(reg, &check);
-    printf("reg %x val %x check %x\n", reg, val, check);
-    assert(check == val);*/
 }
 
 /*
@@ -259,6 +260,41 @@ void rfm95_send(const uint8_t *buffer, size_t size) {
     if (current_length + size > MAX_PKT_LENGTH) {
         size = MAX_PKT_LENGTH - current_length;
     }
+    if (LORA_FHSS_ENABLED) {
+        uint8_t irq_mask;
+        rfm95_read_register(REG_IRQMASK, &irq_mask);
+        irq_mask &= ~(RFLR_IRQFLAGS_TXDONE);
+        rfm95_write_register(REG_IRQMASK, irq_mask);
+        rfm95_write_register(REG_IRQMASK, RFLR_IRQFLAGS_RXTIMEOUT |
+                                                  RFLR_IRQFLAGS_RXDONE |
+                                                  RFLR_IRQFLAGS_PAYLOADCRCERROR |
+                                                  RFLR_IRQFLAGS_VALIDHEADER |
+                                                  RFLR_IRQFLAGS_CADDONE |
+                                                  RFLR_IRQFLAGS_CADDETECTED);
+        uint8_t dio_mapping1;
+        rfm95_read_register(REG_DIO_MAPPING_1, &dio_mapping1);
+        dio_mapping1 = (dio_mapping1 & RFLR_DIOMAPPING1_DIO0_MASK & RFLR_DIOMAPPING1_DIO2_MASK) | RFLR_DIOMAPPING1_DIO0_01 | RFLR_DIOMAPPING1_DIO2_00;
+        rfm95_write_register(REG_DIO_MAPPING_1, dio_mapping1);                                       
+    }
+    else {
+        uint8_t irq_mask;
+        rfm95_read_register(REG_IRQMASK, &irq_mask);
+        irq_mask &= ~(RFLR_IRQFLAGS_TXDONE);
+        rfm95_write_register(REG_IRQMASK, irq_mask);
+        rfm95_write_register(REG_IRQMASK, RFLR_IRQFLAGS_RXTIMEOUT |
+                                          RFLR_IRQFLAGS_RXDONE |
+                                          RFLR_IRQFLAGS_PAYLOADCRCERROR |
+                                          RFLR_IRQFLAGS_VALIDHEADER |
+                                          RFLR_IRQFLAGS_CADDONE |
+                                          RFLR_IRQFLAGS_CADDETECTED |
+                                          RFLR_IRQFLAGS_FHSSCHANGEDCHANNEL);
+        uint8_t dio_mapping1;
+        rfm95_read_register(REG_DIO_MAPPING_1, &dio_mapping1);
+        dio_mapping1 = (dio_mapping1 & RFLR_DIOMAPPING1_DIO0_MASK) | RFLR_DIOMAPPING1_DIO0_01;
+        rfm95_write_register(REG_DIO_MAPPING_1, dio_mapping1); 
+
+    }
+    rfm95_current_radio_state = RF_TX_RUNNING;
     // update length
     rfm95_write_register(REG_PAYLOAD_LENGTH,  size);
     rfm95_write_register(REG_FIFO_TX_BASE_ADDR, 0);
@@ -276,18 +312,18 @@ void rfm95_send(const uint8_t *buffer, size_t size) {
 void rfm95_dio0_irq(uint8_t pin, uint8_t val) {
     uint8_t snr_u = 0, rssi_u = 0, size_rx = 0, i = 0;
     int8_t snr = 0, rssi = 0;
-    uint8_t irq_flags;
-
+    //printf("IRQ handler\n");
     switch (rfm95_current_radio_state) {
         case RF_RX_RUNNING:
             //rx done
             //clear signal on expander
+            IrqFired = true;
             if (val != 1) {
                 assert(0);
             }
             //clear irq on rfm chip
-            rfm95_write_register( REG_IRQ_FLAGS, RFLR_IRQFLAGS_RXDONE );
             rfm95_read_register(REG_IRQ_FLAGS, &irq_flags);
+            rfm95_write_register( REG_IRQ_FLAGS, RFLR_IRQFLAGS_RXDONE );
             if((irq_flags & RFLR_IRQFLAGS_PAYLOADCRCERROR_MASK ) == RFLR_IRQFLAGS_PAYLOADCRCERROR ) {
                 rfm95_write_register(REG_IRQ_FLAGS, RFLR_IRQFLAGS_PAYLOADCRCERROR);
                 rfm95_current_radio_state = RF_IDLE;
@@ -325,7 +361,7 @@ void rfm95_dio0_irq(uint8_t pin, uint8_t val) {
             rfm95_read_register(REG_RX_NB_BYTES, &size_rx);
             printf("size %x\n", size_rx);
             //read fifo
-            for (i = 0; i < size_rx; i++) {
+            for (i = 0; i < 32; i++) {
                 rfm95_read_register(REG_FIFO, &rx_buffer[i]);
                 printf("%c\n", rx_buffer[i]);
             }
@@ -336,9 +372,14 @@ void rfm95_dio0_irq(uint8_t pin, uint8_t val) {
             rfm95_idle();
             break;
         case RF_TX_RUNNING:
-
+            //printf("TX interrupt fired\n");
+            IrqFired = true;
+            rfm95_write_register( REG_IRQ_FLAGS, RFLR_IRQFLAGS_TXDONE );
+            rfm95_current_radio_state = RF_IDLE;
+            rfm95_idle();
             break;
         default:
+            rfm95_idle();
             break;
     }
 }
@@ -358,15 +399,15 @@ void rfm95_receive() {
         rfm95_write_register(REG_INVERTIQ, invert_iq);
         rfm95_write_register(REG_INVERTIQ2, RFLR_INVERTIQ2_OFF);
     }
-    //printf("sha-1\n");
+    printf("sha-1\n");
     // ERRATA 2.3 - Receiver Spurious Reception of a LoRa Signal
-    if (LORA_BANDWIDTH < 9) {
+    if ((LORA_BANDWIDTH + 7) < 9) {
         uint8_t optimize_detect;
         rfm95_read_register(REG_DETECTION_OPTIMIZE, &optimize_detect);
         optimize_detect &= 0x7f;
         rfm95_write_register(REG_DETECTION_OPTIMIZE, optimize_detect);
         rfm95_write_register(REG_30, 0x00);
-        switch(LORA_BANDWIDTH) {
+        switch((LORA_BANDWIDTH + 7)) {
             case 0: // 7.8 kHz
                 rfm95_write_register( REG_2F, 0x48 );
                 set_frequency(RF_FREQUENCY + 7.81e3 );
@@ -376,7 +417,7 @@ void rfm95_receive() {
                 set_frequency(RF_FREQUENCY + 10.42e3 );
                 break;
             case 2: // 15.6 kHz
-                rfm95_write_register( REG_2F, 0x0 );
+                rfm95_write_register( REG_2F, 0x44 );
                 set_frequency(RF_FREQUENCY + 15.62e3 );
                 break;
             case 3: // 20.8 kHz
@@ -408,8 +449,12 @@ void rfm95_receive() {
         optimize_detect |= 0x80;
         rfm95_write_register(REG_DETECTION_OPTIMIZE, optimize_detect); 
     }
-    //printf("sha-2\n");
+    printf("sha-2\n");
     if (LORA_FHSS_ENABLED) {
+        uint8_t irq_mask;
+        rfm95_read_register(REG_IRQMASK, &irq_mask);
+        irq_mask &= ~(RFLR_IRQFLAGS_RXDONE);
+        rfm95_write_register(REG_IRQMASK, irq_mask);
         rfm95_write_register(REG_IRQMASK, RFLR_IRQFLAGS_VALIDHEADER |
                                            RFLR_IRQFLAGS_TXDONE |
                                            RFLR_IRQFLAGS_CADDONE |
@@ -420,6 +465,10 @@ void rfm95_receive() {
         rfm95_write_register(REG_DIO_MAPPING_1, dio_mapping1);                                       
     }
     else {
+        uint8_t irq_mask;
+        rfm95_read_register(REG_IRQMASK, &irq_mask);
+        irq_mask &= ~(RFLR_IRQFLAGS_RXDONE);
+        rfm95_write_register(REG_IRQMASK, irq_mask);
         rfm95_write_register(REG_IRQMASK, RFLR_IRQFLAGS_VALIDHEADER |
                                           RFLR_IRQFLAGS_TXDONE |
                                           RFLR_IRQFLAGS_CADDONE |
@@ -431,15 +480,15 @@ void rfm95_receive() {
         rfm95_write_register(REG_DIO_MAPPING_1, dio_mapping1); 
 
     }
-    //printf("sha-3\n");
+    printf("sha-3\n");
     rfm95_write_register( REG_FIFO_RX_BASE_ADDR, 128);
     rfm95_write_register( REG_FIFO_ADDR_PTR, 128 );
     //change state to indicate we are receiving
     rfm95_current_radio_state = RF_RX_RUNNING;
-    //printf("sha-4\n");
+    printf("sha-4\n");
     //TODO - placeholder for being able to receive continously
     rfm95_rx();
-    //printf("sha-5\n");
+    printf("sha-5\n");
     //while(!lora);
     //lora = 0;
     /* uint8_t size_rx, i = 0;
@@ -447,7 +496,8 @@ void rfm95_receive() {
     printf("size %x\n", size_rx);
     //read fifo
     for (i = 0; i < 4; i++) {
-        rfm95_read_register(REG_FIFO, &rx_buffer[i]);
+        rfm95_read_registe
+        r(REG_FIFO, &rx_buffer[i]);
         printf("%c\n", rx_buffer[i]);
     }
     memset(rx_buffer, 0 , LORA_RX_BUFFER_SIZE);
@@ -531,6 +581,9 @@ void rfm95_set_lora_opmode() {
     rfm95_write_register(REG_DIO_MAPPING_2, 0x00);
 }
 
+radio_state_t rfm95_get_op_mode() {
+    return rfm95_current_radio_state;
+}
 void rfm95_set_rx_config(uint32_t band_width, uint32_t data_rate, uint8_t code_rate,
                           uint32_t bandwidth_afc, uint16_t preamble_length, uint16_t symb_timeout, bool fix_length,
                           uint8_t payload_length, bool crc_on, bool freq_hop_on, uint8_t hop_period,
@@ -627,25 +680,33 @@ void rfm95_isr_handler(uint8_t pin, uint8_t val) {
     }
 }
 
-void lora_task() {
+void lora_task_old() {
     while (1) {
         //uint8_t rx_data = 0;
         //lets try transmitting a PHY message for now
-        uint8_t data[4] = {'T', 'I', 'N', 'G'};
+        uint8_t data[4] = {'P', 'I', 'N', 'G'};
         //begin_packet();
         rfm95_send(data, 4);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        while (rfm95_current_radio_state == RF_TX_RUNNING) {
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            taskYIELD();
+        }
+        //vTaskDelay(1000 / portTICK_PERIOD_MS);
         rfm95_receive();
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        rfm95_dio0_irq(MCP_DIO0_PIN_NUMBER, 1);
+        while (rfm95_current_radio_state == RF_RX_RUNNING) {
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            taskYIELD();
+        }
+        //vTaskDelay(1000 / portTICK_PERIOD_MS);
+        //rfm95_dio0_irq(MCP_DIO0_PIN_NUMBER, 1);
         //vTaskDelay(1000 / portTICK_PERIOD_MS);
         //rfm95_send(data, 4);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
         //end_packet();
     }
 }
 
-void lora_init() {
+void rfm95_init() {
     //initialize the HOPE RF module
     //configuration settings used from https://github.com/sandeepmistry/arduino-LoRa
     uint8_t rx_data = 0;
@@ -715,6 +776,6 @@ void lora_init() {
     pinMode(0xB, GPIO_MODE_INPUT);
     setupInterruptPin(0xB,GPIO_INTR_HIGH_LEVEL);
 
-    xTaskCreate(lora_task, "lora_task", 8192, NULL, 9, NULL);
+    xTaskCreate(lora_task_old, "lora_task", 8192, NULL, 9, NULL);
     
 }

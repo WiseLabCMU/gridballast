@@ -36,7 +36,7 @@ rwlock_t i2c_lock;
 
 const char * const ct_task_name = "ct_module_task";
 
-static esp_adc_cal_characteristics_t *adc_chars;
+esp_adc_cal_characteristics_t *adc_chars;
 
 static intr_handle_t s_timer_handle;
 
@@ -131,7 +131,7 @@ static void relay_task(void* arg)
   }
 }*/
 
-static void check_efuse()
+void check_efuse()
 {
     //Check TP is burned into eFuse
     if (esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP) == ESP_OK) {
@@ -170,18 +170,18 @@ void adc1_config() {
     //Check if Two Point or Vref are burned into eFuse
     check_efuse();
 
-	adc1_config_width(ADC_WIDTH_9Bit);
-	adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_11db);
+	adc1_config_width(ADC_WIDTH_12Bit);
+	adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_0db);
 	
-	//adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
-	//esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_0db, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars);
-	//print_char_val_type(val_type);
-	//free(adc_chars);
+	adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
+	esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_0db, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars);
+	print_char_val_type(val_type);
+	free(adc_chars);
 
 }
 
 void adc2_config() {
-    adc2_config_channel_atten( ADC2_CHANNEL_7, ADC_ATTEN_11db );
+    adc2_config_channel_atten( ADC2_CHANNEL_7, ADC_ATTEN_0db );
 }
 
 /*void ct_init_task( void ) {

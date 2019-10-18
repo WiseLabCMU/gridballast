@@ -27,5 +27,6 @@ void ct_init_task( void );
 void adc1_config();
 void adc2_config();
 uint32_t get_voltage(int);
+void check_efuse();
 
 #endif /* __ct_module_h_ */
