@@ -44,10 +44,6 @@ void IRAM_ATTR frq_isr_handler(void* arg)
   xQueueSendFromISR(frq_queue, &timer_val, NULL);
 }
 
-void frq_mqtt_post(float f){
-  // printf("Frequency is\n");
-  // printf( "%6.4lf", f );
-}
 
 void frq_task(void* arg) {
 	// infinite loop
@@ -70,8 +66,7 @@ void frq_task(void* arg) {
       {
         avg_frq = (avg_frq*l + frq)/(l+1);
         l++;
-        //Call mqtt frequency send here
-        frq_mqtt_post(frq);
+
       }
       if(l >= 200) {
 

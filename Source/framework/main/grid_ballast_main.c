@@ -92,7 +92,7 @@ void init_task( void *pv_parameters ) {
     printf("Initializing lcd\n");
     lcd_init_task();
     //wifi_adc_init();  
-    lora_init();     
+    // lora_init();     
     //rs485_init_task();
     //ct_init_task();
     printf("Initialization done\n");    

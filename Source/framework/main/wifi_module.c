@@ -437,6 +437,12 @@ static void wifi_task_fn( void *pv_parameters ) {
     }
 }
 
+void send_freq_wrapper( void ){
+    char data_buf[16];
+    sprintf(data_buf, "%.4f", system_state.grid_freq);
+    send_transducer_value(TRANSDUCER_ID_GRID_FREQ, data_buf);
+};
+
 static void run_mode_normal() {
     /*FYI person reading it in the future -
     The normal mode function was originally written to run in an infinite
@@ -510,7 +516,8 @@ static void run_mode_normal() {
             printf("Relay 1 status %f\n", relay_1);
             pinMode(6,GPIO_MODE_OUTPUT); 
             digitalWrite(6,relay_1);
-            rwlock_reader_unlock(&system_state_lock);     
+            rwlock_reader_unlock(&system_state_lock);
+            send_freq_wrapper();     
         }
         // get relay_2 setting from open chirp, set in system_state. Toggle relay accordingly
         double relay_2;
@@ -523,6 +530,7 @@ static void run_mode_normal() {
             pinMode(7,GPIO_MODE_OUTPUT); 
             digitalWrite(7,relay_2);
             rwlock_reader_unlock(&system_state_lock);
+            send_freq_wrapper();
         }
 
         // if full auto mode, get send current state first
@@ -543,17 +551,17 @@ static void run_mode_normal() {
             // }
         }
 
-        for (int countdown = 9; countdown >= 0; countdown--) {
-            ESP_LOGI(TAG, "%d... ", countdown);
-	        rwlock_reader_lock(&system_state_lock);
-		    get_system_state(&system_state);
-			rwlock_reader_unlock(&system_state_lock);
-		    if (system_state.lcd_display_mode == CHANGE_WIFI_CONFIG) {
-			    module_mode = MODULE_MODE_CONFIG;
-			    return;
-		    }
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-        }
+        // for (int countdown = 9; countdown >= 0; countdown--) {
+        //     ESP_LOGI(TAG, "%d... ", countdown);
+	    //     rwlock_reader_lock(&system_state_lock);
+		//     get_system_state(&system_state);
+		// 	rwlock_reader_unlock(&system_state_lock);
+		//     if (system_state.lcd_display_mode == CHANGE_WIFI_CONFIG) {
+		// 	    module_mode = MODULE_MODE_CONFIG;
+		// 	    return;
+		//     }
+        //     vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // }
         ESP_LOGI(TAG, "Starting again!");
     }
 }
@@ -610,3 +618,4 @@ void send_temp_set_wrapper( void ){
     sprintf(data_buf, "%d", system_state.set_point);
     send_transducer_value(TRANSDUCER_ID_SET_POINT, data_buf);
 };
+
