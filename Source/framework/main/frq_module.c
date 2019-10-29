@@ -44,6 +44,7 @@ void IRAM_ATTR frq_isr_handler(void* arg)
   xQueueSendFromISR(frq_queue, &timer_val, NULL);
 }
 
+
 void frq_task(void* arg) {
 	// infinite loop
 	uint64_t duration = 0;
@@ -53,7 +54,6 @@ void frq_task(void* arg) {
 
   for(;;) {
     // wait for the notification from the ISR
-		
 		xQueueReceive(frq_queue, &timer_val, portMAX_DELAY);
 
     duration = timer_val - last_val;
@@ -61,17 +61,12 @@ void frq_task(void* arg) {
 		last_val = timer_val;
 
 		if(duration > 15000) {
-      frq = 1.0/duration*1000000*1.0;
-      
-
-
+      frq = 1.0/duration*1000000*1.0;     
       if (frq > 50)
       {
         avg_frq = (avg_frq*l + frq)/(l+1);
-
-
-  
         l++;
+
       }
       if(l >= 200) {
 
@@ -100,6 +95,7 @@ void frq_init_task(void *arg) {
     gpio_set_direction(CONFIG_FRQ_PIN, GPIO_MODE_INPUT);
     gpio_set_direction(12, GPIO_MODE_OUTPUT);
 
+    //Creates frequency task in freq que
     frq_queue = xQueueCreate(1, sizeof(timer_val));
 
 

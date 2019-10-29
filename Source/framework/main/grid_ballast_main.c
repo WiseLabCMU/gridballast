@@ -79,7 +79,7 @@ void init_task( void *pv_parameters ) {
     set_system_state(&gb_system_state);
     rwlock_writer_unlock(&system_state_lock);
         
-    //wifi_init_task();
+    wifi_init_task();
     //sensing_init_task();
 
     controller_init_task();
@@ -94,6 +94,7 @@ void init_task( void *pv_parameters ) {
     lcd_init_task();
     //wifi_adc_init();  
     rfm95_init();     
+    // lora_init();     
     //rs485_init_task();
     //ct_init_task();
     printf("Initialization done\n");    

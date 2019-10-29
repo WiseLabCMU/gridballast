@@ -37,11 +37,10 @@
 #include "ct_module.h"
 #include "esp_adc_cal.h"
 
-
-/* typedef enum {
+typedef enum {
     MODULE_MODE_NORMAL,
     MODULE_MODE_CONFIG
-} module_mode_t;*/
+} module_mode_t;
 
 /* OpenChirp transducer ids for system state fields */
 #define TRANSDUCER_ID_TEMP_BOTTOM "temp_bottom"
@@ -50,11 +49,12 @@
 #define TRANSDUCER_ID_SET_POINT   "temp_set"
 #define TRANSDUCER_ID_RELAY_1     "relay_1"
 #define TRANSDUCER_ID_RELAY_2     "relay_2"
-#define WIFI_TIMEOUT               10
 
 const char * const wifi_task_name = "wifi_module_task";
 static const char *TAG = "wifi";
 extern esp_adc_cal_characteristics_t *adc_chars;
+
+static volatile module_mode_t module_mode;
 
 /** @brief FreeRTOS event group to signal when softap is up */
 static EventGroupHandle_t wifi_event_group;
@@ -71,34 +71,8 @@ static system_state_t system_state;
 
 /* Static function definitions */
 static void reset_transducer_response();
-
-TaskHandle_t wifi_task_handler;
-
-uint64_t reg_a;
-uint64_t reg_b;
-uint64_t reg_c;
-
-char ssid[ssid_maxlen];
-char pass[pass_maxlen];
-
-static intr_handle_t s_timer_handle;
-int timr_group = TIMER_GROUP_1;
-int timr_idx = TIMER_0;
-
-int voltage_val[NO_OF_ADC_SAMPLES];
-int current_val[NO_OF_ADC_SAMPLES];
-
-static volatile wifi_module_mode_t wifi_module_mode;
-//uint8_t wifi_counter = 0;
-volatile bool timer_flag = true;
-
-
-void IRAM_ATTR timer_group1_isr(void *param) {
-	TIMERG1.int_clr_timers.t1 = 1;
-    //timer_pause(timr_group, timr_idx);
-	TIMERG1.hw_timer[timr_idx].config.alarm_en = 1;
-    timer_flag = true;
-}
+static void run_mode_normal();
+static void run_mode_config();
 
 /**
  * @brief Wifi event handler
@@ -147,20 +121,23 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
  * @brief Common wifi initialization that occurs before the wifi task starts
  * Sets up hardware
  */
-void init_wifi(void) {
+static void init_wifi(void) {
     tcpip_adapter_init();
+
     wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK( esp_event_loop_init(event_handler, NULL) );
+
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
+
     config_init();
 }
 
 /**
  * @brief Set wifi to station mode (connect to access point)
  */
-void init_mode_sta(const char *ssid, const char *password) {
+static void init_mode_sta(const char *ssid, const char *password) {
     wifi_config_t wifi_config;
     strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
     strncpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
@@ -168,13 +145,14 @@ void init_mode_sta(const char *ssid, const char *password) {
     ESP_LOGI(TAG, "Setting WiFi configuration SSID %s password %s", wifi_config.sta.ssid, wifi_config.sta.password);
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
+
     ESP_ERROR_CHECK( esp_wifi_start() );
 }
 
 /**
  * @brief Set wifi to soft-ap mode (serve as access point)
  */
-void init_mode_ap(void) {
+static void init_mode_ap(void) {
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_AP) );
     wifi_config_t ap_config = {
         .ap = {
@@ -407,6 +385,11 @@ static int send_data(system_state_t *system_state) {
 
     // only update grid frequency if it is nonzero so we don't push bogus value when
     // the zero crossing circuit is not connected
+    if (err == 0) {
+        sprintf(data_buf, "%d", system_state->set_point);
+        err = send_transducer_value(TRANSDUCER_ID_SET_POINT, data_buf);
+    }
+    
     if (err == 0) { //system_state->grid_freq > 5.0) {
         sprintf(data_buf, "%.4f", system_state->grid_freq);
         err = send_transducer_value(TRANSDUCER_ID_GRID_FREQ, data_buf);
@@ -422,11 +405,6 @@ static int send_data(system_state_t *system_state) {
         err = send_transducer_value(TRANSDUCER_ID_TEMP_TOP, data_buf);
     }
 
-    if (err == 0) {
-        sprintf(data_buf, "%d", system_state->set_point);
-        err = send_transducer_value(TRANSDUCER_ID_SET_POINT, data_buf);
-    }
-
     return err;
 }
 
@@ -437,13 +415,11 @@ static int send_data(system_state_t *system_state) {
  *
  * @return void
  */
-/* static void wifi_task_fn( void *pv_parameters ) {
+static void wifi_task_fn( void *pv_parameters ) {
     // try to read saved wifi config
-    init_wifi();
-    // char ssid[ssid_maxlen];
-    //char pass[pass_maxlen];
+    char ssid[ssid_maxlen];
+    char pass[pass_maxlen];
     esp_err_t err = config_get_wifi(ssid, ssid_maxlen, pass, pass_maxlen);
-    while(1);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
         // no saved values, so enter config mode
         module_mode = MODULE_MODE_CONFIG;
@@ -467,9 +443,15 @@ static int send_data(system_state_t *system_state) {
         }
         ESP_ERROR_CHECK(esp_wifi_stop());
     }
-}*/
+}
 
-void run_mode_normal() {
+void send_freq_wrapper( void ){
+    char data_buf[16];
+    sprintf(data_buf, "%.4f", system_state.grid_freq);
+    send_transducer_value(TRANSDUCER_ID_GRID_FREQ, data_buf);
+};
+
+static void run_mode_normal() {
     /*FYI person reading it in the future -
     The normal mode function was originally written to run in an infinite
     loop i.e. once we enter normal mode on boot up, we weren't meant
@@ -483,11 +465,10 @@ void run_mode_normal() {
     
     reset_transducer_response();
     ESP_LOGI(TAG, "Running normal mode");
-    if (wifi_module_mode == WIFI_MODULE_MODE_NORMAL) {
+    while (module_mode == MODULE_MODE_NORMAL) {
         /* Wait for the callback to set the CONNECTED_BIT in the
            event group.
         */
-        uint8_t wait = 0;
         while (!((*(uint8_t *)wifi_event_group) & CONNECTED_BIT)) {
             xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
                                 false, true, WIFI_TASK_DELAY);
@@ -499,18 +480,9 @@ void run_mode_normal() {
     		//before we do continue, cause maybe 
     		//the user wanted to change the config
     		if (system_state.lcd_display_mode == CHANGE_WIFI_CONFIG) {
-    			wifi_module_mode = WIFI_MODULE_MODE_CONFIG;
+    			module_mode = MODULE_MODE_CONFIG;
     			return;
-            }
-            if (wait == WIFI_TIMEOUT) {
-                //try again next time, cant keep waiting here forever
-                wait = 0;
-                return;
-            } 
-            else {
-                wait++;
-                vTaskDelay(500/portTICK_PERIOD_MS);
-            }
+    		}			
         }
 
 		rwlock_reader_lock(&system_state_lock);
@@ -520,23 +492,27 @@ void run_mode_normal() {
 		//before we do continue, cause maybe 
 		//the user wanted to change the config
 		if (system_state.lcd_display_mode == CHANGE_WIFI_CONFIG) {
-			wifi_module_mode = WIFI_MODULE_MODE_CONFIG;
+			module_mode = MODULE_MODE_CONFIG;
 			return;
 		}
 
         ESP_LOGI(TAG, "Connected to AP");
-		
-        // send data to openchirp
-        send_data(&system_state);
-
-        // get data from openchirp
-        double set_point;
-        if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
-            rwlock_reader_lock(&system_state_lock);
-            get_system_state(&system_state);
-            system_state.set_point = set_point;
-            set_system_state(&system_state);
-            rwlock_reader_unlock(&system_state_lock);
+		// send_data(&system_state);
+        //Work in progress
+        // send data to openchirp if manual mode, then recieve from open chirp
+        if (system_state.input_mode == 0){
+            // get data from openchirp
+            double set_point;
+            if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
+                rwlock_reader_lock(&system_state_lock);
+                get_system_state(&system_state);
+                system_state.set_point = set_point;
+                set_system_state(&system_state);
+                printf("System set point is %i\n", system_state.set_point);
+                printf("System State is %i\n", system_state.input_mode);
+                rwlock_reader_unlock(&system_state_lock);
+            }
+            send_data(&system_state);
         }
         // get relay_1 setting from open chirp, set in system_state. Toggle relay accordingly
         double relay_1;
@@ -545,10 +521,11 @@ void run_mode_normal() {
             get_system_state(&system_state);
             system_state.relay_1 = relay_1;
             set_system_state(&system_state);
-            printf("Relay 1 status %f", relay_1);
+            printf("Relay 1 status %f\n", relay_1);
             pinMode(6,GPIO_MODE_OUTPUT); 
             digitalWrite(6,relay_1);
-            rwlock_reader_unlock(&system_state_lock);     
+            rwlock_reader_unlock(&system_state_lock);
+            send_freq_wrapper();     
         }
         // get relay_2 setting from open chirp, set in system_state. Toggle relay accordingly
         double relay_2;
@@ -557,31 +534,48 @@ void run_mode_normal() {
             get_system_state(&system_state);
             system_state.relay_2 = relay_2;
             set_system_state(&system_state);
-            printf("Relay 2 status %f", system_state.relay_2);
+            printf("Relay 2 status %f\n", system_state.relay_2);
             pinMode(7,GPIO_MODE_OUTPUT); 
             digitalWrite(7,relay_2);
             rwlock_reader_unlock(&system_state_lock);
+            send_freq_wrapper();
         }
 
-        /* for (int countdown = 9; countdown >= 0; countdown--) {
-            ESP_LOGI(TAG, "%d... ", countdown);
-	        rwlock_reader_lock(&system_state_lock);
-		    get_system_state(&system_state);
-			rwlock_reader_unlock(&system_state_lock);
-		    if (system_state.lcd_display_mode == CHANGE_WIFI_CONFIG) {
-			    module_mode = MODULE_MODE_CONFIG;
-			    return;
-		    }			
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-        }*/
-        //ESP_ERROR_CHECK(esp_wifi_stop());
-        //ESP_ERROR_CHECK(esp_wifi_deinit());
+        // if full auto mode, get send current state first
+        if (system_state.input_mode == 1){
+            //Send data
+            send_data(&system_state);
+            printf("System state is %i\n", system_state.input_mode);
+
+            // get data from openchirp
+            // double set_point;
+            // if (get_transducer_value(TRANSDUCER_ID_SET_POINT, &set_point) == 0) {
+            //     rwlock_reader_lock(&system_state_lock);
+            //     get_system_state(&system_state);
+            //     system_state.set_point = set_point;
+            //     set_system_state(&system_state);
+            //     printf("System set point is %i", system_state.set_point);
+            //     rwlock_reader_unlock(&system_state_lock);
+            // }
+        }
+
+        // for (int countdown = 9; countdown >= 0; countdown--) {
+        //     ESP_LOGI(TAG, "%d... ", countdown);
+	    //     rwlock_reader_lock(&system_state_lock);
+		//     get_system_state(&system_state);
+		// 	rwlock_reader_unlock(&system_state_lock);
+		//     if (system_state.lcd_display_mode == CHANGE_WIFI_CONFIG) {
+		// 	    module_mode = MODULE_MODE_CONFIG;
+		// 	    return;
+		//     }
+        //     vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // }
         ESP_LOGI(TAG, "Starting again!");
     }
 }
 
 
-void run_mode_config() {
+static void run_mode_config() {
     xEventGroupWaitBits(wifi_event_group, SOFTAP_UP_BIT, false, true, portMAX_DELAY);
     tcpip_adapter_ip_info_t ip_info;
     ESP_ERROR_CHECK( tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ip_info) );
@@ -589,7 +583,7 @@ void run_mode_config() {
     ESP_LOGI(TAG, "Reboot to exit config mode");
 
     config_server_run();
- }
+}
 
 /*****************************************
  *********** INTERFACE FUNCTIONS *********
@@ -601,6 +595,20 @@ void run_mode_config() {
  * @return void
  */
 void wifi_init_task( void ) {
+
+    printf("Intializing Wifi System...");
+    //Sets up hardware
+    init_wifi();
+    //Create Task
+    xTaskCreate(
+                &wifi_task_fn, /* task function */
+                wifi_task_name, /* wifi task name */
+                wifiUSStackDepth, /* stack depth */
+                NULL, /* parameters to fn_name */
+                wifiUXPriority, /* task priority */
+                NULL /* task handle ( returns an id basically ) */
+               );
+    fflush(stdout);
 }
 
 /**
@@ -753,34 +761,9 @@ static void wifi_adc_task () {
         wifi_task_fn();
     }*/
 }
-
-/*
-Initialization function for the task that takes care of running the Wifi
-and ADC module. This function creates a task and initializes a timer that will
-trigger an interrupt every 0.5s
-Input - None
-Output - None
-*/
- void wifi_adc_init() {
-    printf("Creating ADC and wifi task \n");
-    timer_config_t config;
-
-    //configure a timer that will run every 0.5s
-    config.alarm_en = 1;
-    config.auto_reload = 1;
-    config.counter_dir = TIMER_COUNT_UP;
-    config.divider = TIMER_DIVIDER;
-    config.intr_type = TIMER_INTR_LEVEL;
-    config.counter_en = false;
-
-    //use the above configuration to set the hardware
-    timer_init(timr_group, timr_idx, &config);
-    timer_set_alarm_value(timr_group, timr_idx, 5000);
-    timer_enable_intr(timr_group, timr_idx);
-    timer_isr_register(timr_group, timr_idx, &timer_group1_isr, NULL, 0, &s_timer_handle);
-    //timer_start(timr_group, timr_idx);
-
-    //create a task to run, we will not initialize any hardware here,
-    //instead we will initialize it everytime when the task runs
-    xTaskCreatePinnedToCore(wifi_adc_task, "wifi_adc_task", wifi_adc_stack_depth, NULL, wifi_adc_task_priority, NULL, 0);
-}
+//Public wrapper which calls the send_transducer function for set_temp
+void send_temp_set_wrapper( void ){
+    char data_buf[16];
+    sprintf(data_buf, "%d", system_state.set_point);
+    send_transducer_value(TRANSDUCER_ID_SET_POINT, data_buf);
+};

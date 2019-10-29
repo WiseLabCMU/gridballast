@@ -21,13 +21,17 @@
 #include "rwlock.h"
 
 
-const char * const controller_task_name = "controller_module_task";
 
-system_state_t mystate;
+const char * const controller_task_name = "controller_module_task";
+static const char *TAG = "CONTROLLER_MAIN";
+
+
+static system_state_t mystate;
 
 /*****************************************
  ************ MODULE FUNCTIONS ***********
  *****************************************/
+
 
 /**
  * @brief controller task logic
@@ -49,31 +53,42 @@ static void controller_task_fn( void *pv_parameters )
     //if ( strcmp(mystate.mode,"E")== 0)
 
     //printf("bye...\n");
-     if ( mystate.input_mode == 1)
-      {
+        if ( mystate.input_mode == 1){
+            if (mystate.grid_freq > mystate.threshold_overfrq){
+                printf("FREQ TOO HIGH\n");
+                ESP_LOGI(TAG, "FREQUENCY TOO HIGH");
 
-        if (mystate.grid_freq > mystate.threshold_overfrq)
-        {
-            rwlock_writer_lock(&system_state_lock);
-            get_system_state(&gb_system_state);
-            gb_system_state.set_point = 140 ;
-            set_system_state(&gb_system_state);
-            rwlock_writer_unlock(&system_state_lock);
+                //Delay Task from 0 to 5 minutes
+                printf("DELAY STARTING NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+                vTaskDelay((rand() % 300000) / portTICK_PERIOD_MS);
+                printf("DELAY ENDED NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+                rwlock_writer_lock(&system_state_lock);
+                get_system_state(&gb_system_state);
+                gb_system_state.set_point = 140 ;
+                set_system_state(&gb_system_state);
+                rwlock_writer_unlock(&system_state_lock);
+            }
+
+            if (mystate.grid_freq < mystate.threshold_underfrq){
+                printf("FREQ TOO LOW\n");
+                ESP_LOGI(TAG, "FREQUENCY TOO LOW");
+
+                printf("DELAY STARTING NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+                //Delay Task from 0 to 5 minutes
+                vTaskDelay((rand() % 300000) / portTICK_PERIOD_MS);
+                printf("DELAY ENDED NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+
+                rwlock_writer_lock(&system_state_lock);
+                get_system_state(&gb_system_state);
+                gb_system_state.set_point = 110 ;
+                set_system_state(&gb_system_state);
+                rwlock_writer_unlock(&system_state_lock);
+            }
         }
-
-        if (mystate.grid_freq < mystate.threshold_underfrq)
-        {
-            rwlock_writer_lock(&system_state_lock);
-            get_system_state(&gb_system_state);
-            gb_system_state.set_point = 110 ;
-            set_system_state(&gb_system_state);
-            rwlock_writer_unlock(&system_state_lock);
-        }
-
+        vTaskDelay(500/portTICK_PERIOD_MS);
     }
-    vTaskDelay(500/portTICK_PERIOD_MS);
-}
-
+ESP_LOGI(TAG, "Starting again!");
 }
 
 
@@ -88,15 +103,15 @@ static void controller_task_fn( void *pv_parameters )
  * @return void
  */
 void controller_init_task( void ) {
-
-    printf("Intializing Controlling System...");
+    printf("Intializing Controlling System...************\n");
+    ESP_LOGI(TAG, "TASK STARTING*******************");
     xTaskCreatePinnedToCore(
                 controller_task_fn, /* task function */
                 "controller_task_fn", /* controller task name */
                 2048, /* stack depth */
                 NULL, /* parameters to fn_name */
-                6, /* task priority */
+                controllerUXPriority, /* task priority */
                 NULL,0 /* task handle ( returns an id basically ) */
                );
-    //fflush(stdout);
+    fflush(stdout);
 }
